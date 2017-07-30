@@ -1,0 +1,4 @@
+cmd: "./scripts/pipeline.sh"
+name: "Compile and produce sound"
+keymap: "cmd-shift-1"
+atomCommandName: "atom-build:pipeline"

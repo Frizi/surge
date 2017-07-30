@@ -1,0 +1,10 @@
+[package]
+name = "libsurgemachine"
+version = "0.1.0"
+authors = ["Frizi <frizi09@gmail.com>"]
+
+[lib]
+name = "surgemachine"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]

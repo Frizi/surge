@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "libsurgemachine",
+    "surgemachinevst"
+]
+
+[profile.dev]
+rpath = false
+
+[profile.release]
+rpath = false

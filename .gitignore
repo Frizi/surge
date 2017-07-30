@@ -1,0 +1,6 @@
+/target/
+*.vst/**
+**/*.rs.bk
+Cargo.lock
+.DS_Store
+output.wav
