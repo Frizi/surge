@@ -7,11 +7,6 @@ authors = ["Frizi <frizi09@gmail.com>"]
 name = "pendulum"
 crate-type = ["cdylib"]
 
-[dependencies]
-conrod = "0.54.0"
-glium = "0.17"
-winit = "0.7"
-
 [dependencies.vst2]
 git = "https://github.com/overdrivenpotato/rust-vst2"
 

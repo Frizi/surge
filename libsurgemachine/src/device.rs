@@ -1,8 +1,8 @@
 
-pub type AudioBus<'a> = [&'a mut [f32]; 2];
+pub type AudioBus<'a, T> = [&'a mut [T]; 2];
 
 pub trait Device {
-    fn run<'a> (&mut self, sample_rate: f64, outputs: AudioBus<'a>);
+    fn run<'a> (&mut self, sample_rate: f64, outputs: AudioBus<'a, f32>);
     fn note_on (&mut self, note: u8, velocity: u8);
     fn note_off (&mut self, note: u8, velocity: u8);
 

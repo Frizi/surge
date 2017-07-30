@@ -33,7 +33,7 @@ pub enum ParamIndices {
     VibratoFreq,
     VibratoAmount,
     Rise,
-    
+
     #[allow(non_camel_case_types)]
     LAST_PARAM
 }
@@ -130,7 +130,7 @@ impl Device for Fermi {
     fn get_parameter (&self, index: i32) -> f32 { self.params[index as usize] }
     fn set_parameter (&mut self, index: i32, value: f32) { self.params[index as usize] = value }
 
-    fn run<'a> (&mut self, sample_rate: f64, mut outputs : AudioBus<'a>) {
+    fn run<'a> (&mut self, sample_rate: f64, mut outputs : AudioBus<'a, f32>) {
         let samples = outputs
             .first()
             .unwrap()

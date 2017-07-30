@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+use device::AudioBus;
+
 pub fn fix_denormal (value: f64) -> f64 {
     return value
 }
@@ -13,4 +16,14 @@ pub fn midi_note_to_hz(note: u8) -> f64 {
 
 pub fn time_per_sample (sample_rate: f64) -> f64 {
     1.0 / sample_rate
+}
+
+pub const PI : f64 = 3.14159265359;
+pub const TAU : f64 = PI * 2.0;
+
+pub fn each_frame<'a, T>(mut channels: AudioBus<'a, T>, fun: &mut FnMut(&mut T, &mut T)) -> () {
+    let mut out_it = channels.iter_mut();
+    let left = out_it.next().unwrap();
+    let right = out_it.next().unwrap();
+    left.iter_mut().zip(right.iter_mut()).fold((), |_, (l, r)| fun(l, r));
 }
