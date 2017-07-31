@@ -21,9 +21,9 @@ pub fn time_per_sample (sample_rate: f64) -> f64 {
 pub const PI : f64 = 3.14159265359;
 pub const TAU : f64 = PI * 2.0;
 
-pub fn each_frame<'a, T>(mut channels: AudioBus<'a, T>, fun: &mut FnMut(&mut T, &mut T)) -> () {
+pub fn frame_iter<'a, 'b, T>(mut channels: &'a mut AudioBus<'b, T>) -> impl Iterator<Item=(&'a mut T, &'a mut T)> {
     let mut out_it = channels.iter_mut();
     let left = out_it.next().unwrap();
     let right = out_it.next().unwrap();
-    left.iter_mut().zip(right.iter_mut()).fold((), |_, (l, r)| fun(l, r));
+    left.iter_mut().zip(right.iter_mut())
 }

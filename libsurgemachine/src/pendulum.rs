@@ -1,5 +1,9 @@
 use device::*;
 use helpers;
+use envelope::ADSREnvelope;
+use envelope::Envelope;
+use oscillator::Oscillator;
+use waveform;
 
 #[derive(Debug)]
 pub enum ParamIndices {
@@ -34,56 +38,52 @@ impl ParamIndices {
             1 => ParamIndices::Osc1RatioCoarse,
             2 => ParamIndices::Osc1RatioFine,
 
-            5 => ParamIndices::Osc1Attack,
-            6 => ParamIndices::Osc1Decay,
-            7 => ParamIndices::Osc1Sustain,
-            8 => ParamIndices::Osc1Release,
+            3 => ParamIndices::Osc1Attack,
+            4 => ParamIndices::Osc1Decay,
+            5 => ParamIndices::Osc1Sustain,
+            6 => ParamIndices::Osc1Release,
 
-            9 => ParamIndices::Osc2Waveform,
-            10 => ParamIndices::Osc2RatioCoarse,
-            11 => ParamIndices::Osc2RatioFine,
+            7 => ParamIndices::Osc2Waveform,
+            8 => ParamIndices::Osc2RatioCoarse,
+            9 => ParamIndices::Osc2RatioFine,
 
-            13 => ParamIndices::Osc2Attack,
-            14 => ParamIndices::Osc2Decay,
-            15 => ParamIndices::Osc2Sustain,
-            16 => ParamIndices::Osc2Release,
+            10 => ParamIndices::Osc2Attack,
+            11 => ParamIndices::Osc2Decay,
+            12 => ParamIndices::Osc2Sustain,
+            13 => ParamIndices::Osc2Release,
 
-            17 => ParamIndices::MasterLevel,
+            14 => ParamIndices::MasterLevel,
             _ => panic!("Invalid param index {}", num)
         }
     }
 }
 
 pub struct Pendulum {
-    time: f64,
-    note_duration: f64,
+    sample_rate: f64,
     note: Option<u8>,
-    params: [f32; ParamIndices::LAST_PARAM as usize]
+    params: [f32; ParamIndices::LAST_PARAM as usize],
+    envelope1: ADSREnvelope,
+    envelope2: ADSREnvelope,
+    osc1: Oscillator,
+    osc2: Oscillator,
 }
 
 impl Default for Pendulum {
     fn default() -> Pendulum {
         Pendulum {
-            note_duration: 0.0,
-            time: 0.0,
+            sample_rate: 1.0,
             note: None,
             params: [
-                0.0,
-                0.0,
-                0.0,
+                0.0, 0.0, 0.0,
+                0.5, 0.0, 1.0, 0.5,
+                0.0, 0.0, 1.0,
+                0.2, 0.0, 1.0, 0.2,
                 0.5,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-           ]
+           ],
+           envelope1: Default::default(),
+           envelope2: Default::default(),
+           osc1: Default::default(),
+           osc2: Default::default(),
         }
     }
 }
@@ -92,65 +92,140 @@ impl Pendulum {
     fn param (&self, index: ParamIndices) -> f32 {
         self.params[index as usize]
     }
-}
 
+    fn setup_envelope_1(&mut self) {
+        let a = self.param(ParamIndices::Osc1Attack) as f64;
+        let d = self.param(ParamIndices::Osc1Decay) as f64;
+        let s = self.param(ParamIndices::Osc1Sustain) as f64;
+        let r = self.param(ParamIndices::Osc1Release) as f64;
+        let rate = self.sample_rate;
+        self.envelope1.set_adsr(rate, a, d, s, r);
+    }
+
+    fn setup_envelope_2(&mut self) {
+        let a = self.param(ParamIndices::Osc2Attack) as f64;
+        let d = self.param(ParamIndices::Osc2Decay) as f64;
+        let s = self.param(ParamIndices::Osc2Sustain) as f64;
+        let r = self.param(ParamIndices::Osc2Release) as f64;
+        let rate = self.sample_rate;
+        self.envelope2.set_adsr(rate, a, d, s, r);
+    }
+
+    fn select_waveform (value: f32) -> Box<waveform::Waveform> {
+        let sel = (value * 5.99).floor() as u32;
+        match sel {
+            0 => Box::new(waveform::Sine),
+            1 => Box::new(waveform::Saw),
+            2 => Box::new(waveform::Square),
+            3 => Box::new(waveform::SawExp(0.5)),
+            4 => Box::new(waveform::SawExp(1.2)),
+            5 => Box::new(waveform::SawExp(2.0)),
+            _ => panic!("Wrong waveform type {}", sel)
+        }
+    }
+
+    fn is_finished (&self) -> bool {
+        self.envelope1.is_finished() &&
+        self.envelope2.is_finished()
+    }
+}
 
 impl Device for Pendulum {
     fn get_num_parameters (&self) -> i32 { ParamIndices::LAST_PARAM as i32 }
-    fn get_parameter (&self, index: i32) -> f32 { self.params[index as usize] }
-    fn set_parameter (&mut self, index: i32, value: f32) { self.params[index as usize] = value }
+    fn get_parameter (&self, index: i32) -> f32 {
+        let val = self.params[index as usize];
+        match ParamIndices::from_i32(index) {
+            ParamIndices::Osc1RatioCoarse => (val * 32.99).floor() / 32.0,
+            ParamIndices::Osc2RatioCoarse => (val * 32.99).floor() / 32.0,
+            _ => val
+        }
+    }
 
-    fn run<'a> (&mut self, sample_rate: f64, outputs : AudioBus<'a, f32>) {
-        let samples = outputs
-            .first()
-            .unwrap()
-            .len();
+    fn set_parameter (&mut self, index: i32, value: f32) {
+        self.params[index as usize] = value;
+        match ParamIndices::from_i32(index) {
+            ParamIndices::Osc1Attack => self.setup_envelope_1(),
+            ParamIndices::Osc1Decay => self.setup_envelope_1(),
+            ParamIndices::Osc1Sustain => self.setup_envelope_1(),
+            ParamIndices::Osc1Release => self.setup_envelope_1(),
+            ParamIndices::Osc2Attack => self.setup_envelope_2(),
+            ParamIndices::Osc2Decay => self.setup_envelope_2(),
+            ParamIndices::Osc2Sustain => self.setup_envelope_2(),
+            ParamIndices::Osc2Release => self.setup_envelope_2(),
+            ParamIndices::Osc1Waveform => self.osc1.set_wave(Self::select_waveform(value)),
+            ParamIndices::Osc2Waveform => self.osc2.set_wave(Self::select_waveform(value)),
+            _ => (),
+        };
+    }
 
-        let total_time : f64 = (samples as f64) / sample_rate;
+    fn set_sample_rate (&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+        self.setup_envelope_1();
+        self.setup_envelope_2();
+    }
 
-        if let Some(current_note) = self.note {
-            let freq = helpers::midi_note_to_hz(current_note);
-            let attack = self.param(ParamIndices::Osc1Attack) as f64;
-            let mut i : u64 = 0;
+    fn run<'a> (&mut self, mut outputs : AudioBus<'a, f32>) {
+        let timestep = helpers::time_per_sample(self.sample_rate);
 
-            helpers::each_frame(outputs, &mut|left_sample, right_sample| {
-                let extra_time = total_time * (i as f64) / samples as f64;
-                let t : f64 = self.time + extra_time;
-                let nt = self.note_duration + extra_time;
-
-                let signal = (t * freq * helpers::TAU).sin();
-                // Apply a quick envelope to the attack of the signal to avoid popping.
-
-                let alpha = if nt < attack {
-                 nt / attack
-                } else {
-                 1.0
+        if !self.is_finished() {
+            if let Some(current_note) = self.note {
+                let freq = helpers::midi_note_to_hz(current_note);
+                let freq1 = {
+                    let coarse = self.param(ParamIndices::Osc1RatioCoarse) as f64;
+                    let fine = self.param(ParamIndices::Osc1RatioFine) as f64;
+                    freq * helpers::ratio_scalar(coarse, fine)
                 };
+                let freq2 = {
+                    let coarse = self.param(ParamIndices::Osc2RatioCoarse) as f64;
+                    let fine = self.param(ParamIndices::Osc2RatioFine) as f64;
+                    freq * helpers::ratio_scalar(coarse, fine)
+                };
+                let master = self.param(ParamIndices::MasterLevel) as f64;
 
-                *left_sample =(signal * alpha) as f32;
-                *right_sample = (signal * alpha) as f32;
-                i += 1;
-            });
+                self.osc1.set_freq(freq1);
+                self.osc2.set_freq(freq2);
 
-            self.note_duration += total_time;
-            self.time += total_time;
+                for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
+                    self.envelope1.process();
+                    self.envelope2.process();
+
+                    let osc1val = self.osc1.get_value();
+                    let osc2val = self.osc2.get_value();
+
+                    self.osc1.step(timestep);
+                    self.osc2.step(timestep);
+
+                    let alpha1 = self.envelope1.get_value();
+                    let alpha2 = self.envelope2.get_value();
+
+                    let signal = (
+                        osc1val * alpha1 +
+                        osc2val * alpha2
+                    ) * master;
+
+                    *left_sample = signal as f32;
+                    *right_sample = signal as f32;
+                }
+            }
         }
         else {
-            helpers::each_frame(outputs, &mut|left_sample, right_sample| {
+            for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
                 *left_sample = 0.0;
                 *right_sample = 0.0;
-            });
+            }
         }
     }
 
     fn note_on(&mut self, note: u8, _velocity: u8) {
-        self.note_duration = 0.0;
-        self.note = Some(note)
+        self.note = Some(note);
+        self.envelope1.trigger();
+        self.envelope2.trigger();
     }
 
     fn note_off(&mut self, note: u8, _velocity: u8) {
         if self.note == Some(note) {
-            self.note = None
+            self.envelope1.release();
+            self.envelope2.release();
         }
     }
 }

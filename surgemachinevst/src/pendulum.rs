@@ -37,16 +37,37 @@ impl PendulumPlugin {
                 };
             });
     }
+
+    fn init_device (&mut self) {
+        let mut device = create_device(DeviceType::Pendulum);
+        device.set_sample_rate(self.sample_rate);
+        self.device = Some(device)
+    }
+
+    fn wave_name (value: f32) -> String {
+        let sel = (value * 5.99).floor() as u32;
+        match sel {
+            0 => "Sine",
+            1 => "Saw",
+            2 => "Square",
+            3 => "SawExp(0.5)",
+            4 => "SawExp(1.2)",
+            5 => "SawExp(2.0)",
+            _ => panic!("Wrong waveform type {}", sel)
+        }.to_string()
+    }
 }
 
 pub const TAU : f64 = PI * 2.0;
 
 impl Default for PendulumPlugin {
     fn default() -> PendulumPlugin {
-        PendulumPlugin {
+        let mut plugin = PendulumPlugin {
             sample_rate: 44100.0,
-            device: Some(create_device(DeviceType::Pendulum))
-        }
+            device: None
+        };
+        plugin.init_device();
+        plugin
     }
 }
 
@@ -89,13 +110,22 @@ impl Plugin for PendulumPlugin {
         format!("{:?}", ParamIndices::from_i32(param))
     }
 
+    fn get_parameter_text(&self, param: i32) -> String {
+        let value = self.get_parameter(param);
+
+        match ParamIndices::from_i32(param) {
+            ParamIndices::Osc1Waveform => Self::wave_name(value),
+            ParamIndices::Osc2Waveform => Self::wave_name(value),
+            _ => format!("{:.3}", value),
+        }
+    }
+
     fn set_sample_rate(&mut self, rate: f32) {
         self.sample_rate = rate as f64;
     }
 
     fn process(&mut self, buffer: AudioBuffer<f32>) {
         let (_, mut outputs) = buffer.split();
-        let sample_rate = self.sample_rate;
 
         if outputs.len() < 2 {
             panic!("Outputs should have at least length 2")
@@ -105,10 +135,7 @@ impl Plugin for PendulumPlugin {
         let left = outputs.remove(0);
 
         self.device.as_mut()
-            .map(|dev| dev.run(sample_rate, [ left, right ]));
-
-        outputs.insert(0, left);
-        outputs.insert(1, right);
+            .map(|dev| dev.run([ left, right ]));
     }
 
     fn can_do(&self, can_do: CanDo) -> Supported {
