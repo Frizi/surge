@@ -36,4 +36,8 @@ impl Oscillator {
     pub fn set_wave(&mut self, wave: Dynamic) -> () {
         self.wave = wave
     }
+
+    pub fn phase_reset(&mut self) -> () {
+        self.phase = 0.0;
+    }
 }

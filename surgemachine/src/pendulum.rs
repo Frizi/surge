@@ -62,7 +62,8 @@ define_params_bag!(PendulumParamsBag, PendulumParams, [
 pub struct Pendulum {
     sample_rate: f64,
     voices: [PendulumVoice; 8],
-    params: PendulumParamsBag
+    params: PendulumParamsBag,
+    voice_cycle: u8
 }
 
 
@@ -70,6 +71,7 @@ impl Default for Pendulum {
     fn default() -> Pendulum {
         Pendulum {
             sample_rate: 1.0,
+            voice_cycle: 0,
             voices: Default::default(),
             params: Default::default(),
         }
@@ -161,6 +163,12 @@ impl Voice<PendulumParamsBag> for PendulumVoice {
 
     fn note_on(&mut self, note: u8, _velocity: u8) {
         self.current_note = Some(note);
+        self.osc1.osc_l.phase_reset();
+        self.osc1.osc_r.phase_reset();
+        self.osc2.osc_l.phase_reset();
+        self.osc2.osc_r.phase_reset();
+        self.osc3.osc_l.phase_reset();
+        self.osc3.osc_r.phase_reset();
         self.osc1.envelope.trigger();
         self.osc2.envelope.trigger();
         self.osc3.envelope.trigger();
@@ -191,9 +199,9 @@ impl Voice<PendulumParamsBag> for PendulumVoice {
                     params.get(PendulumParams::Osc3RatioFine) as f64
                 );
 
-                let detune1 = (params.get(PendulumParams::Osc1Detune) as f64) * 0.1 - 0.05 + 1.0;
-                let detune2 = (params.get(PendulumParams::Osc2Detune) as f64) * 0.1 - 0.05 + 1.0;
-                let detune3 = (params.get(PendulumParams::Osc3Detune) as f64) * 0.1 - 0.05 + 1.0;
+                let detune1 = (params.get(PendulumParams::Osc1Detune) as f64) * 0.02 - 0.01 + 1.0;
+                let detune2 = (params.get(PendulumParams::Osc2Detune) as f64) * 0.02 - 0.01 + 1.0;
+                let detune3 = (params.get(PendulumParams::Osc3Detune) as f64) * 0.02 - 0.01 + 1.0;
 
                 self.osc1.phase_offset = (params.get(PendulumParams::Osc1PhaseOffset) as f64) * 0.5;
                 self.osc2.phase_offset = (params.get(PendulumParams::Osc2PhaseOffset) as f64) * 0.5;
@@ -203,11 +211,11 @@ impl Voice<PendulumParamsBag> for PendulumVoice {
                 self.osc3_level = params.get(PendulumParams::Osc3Level);
                 self.osc3_am = params.get(PendulumParams::Osc3AM) > 0.5;
 
-                self.osc1.osc_l.set_freq(osc1freq);
+                self.osc1.osc_l.set_freq(osc1freq / detune1);
                 self.osc1.osc_r.set_freq(osc1freq * detune1);
-                self.osc2.osc_l.set_freq(osc2freq);
+                self.osc2.osc_l.set_freq(osc2freq / detune2);
                 self.osc2.osc_r.set_freq(osc2freq * detune2);
-                self.osc3.osc_l.set_freq(osc3freq);
+                self.osc3.osc_l.set_freq(osc3freq / detune3);
                 self.osc3.osc_r.set_freq(osc3freq * detune3);
 
                 true
@@ -343,11 +351,24 @@ impl Device for Pendulum {
     }
 
     fn note_on(&mut self, note: u8, velocity: u8) {
+        match self.voices.iter_mut().nth(self.voice_cycle as _) {
+            Some(voice) => {
+                if voice.current_note() == None {
+                    voice.note_on(note, velocity);
+                    self.voice_cycle = (self.voice_cycle + 1) % 8;
+                    return;
+                }
+            },
+            _ => ()
+        };
+
+
         for voice in self.voices.iter_mut() {
             if voice.current_note() == None {
                 voice.note_on(note, velocity);
-                break;
+                return;
             }
+
         }
     }
 
