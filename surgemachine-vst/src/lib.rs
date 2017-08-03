@@ -5,11 +5,10 @@ use vst2::buffer::AudioBuffer;
 use vst2::plugin::{Category, Plugin, Info, CanDo};
 use vst2::event::Event;
 use vst2::api::Supported;
-use std::f64::consts::PI;
 
-use surgemachine::{create_device, DeviceType};
+use surgemachine::{create_device, DeviceType, IndexedEnum, PendulumParams};
+use surgemachine::waveform::{Dynamic};
 use surgemachine::device::{Device};
-use surgemachine::pendulum::{ParamIndices};
 
 struct PendulumPlugin {
     sample_rate: f64,
@@ -43,22 +42,7 @@ impl PendulumPlugin {
         device.set_sample_rate(self.sample_rate);
         self.device = Some(device)
     }
-
-    fn wave_name (value: f32) -> String {
-        let sel = (value * 5.99).floor() as u32;
-        match sel {
-            0 => "Sine",
-            1 => "Saw",
-            2 => "Square",
-            3 => "SawExp(0.5)",
-            4 => "SawExp(1.2)",
-            5 => "SawExp(2.0)",
-            _ => panic!("Wrong waveform type {}", sel)
-        }.to_string()
-    }
 }
-
-pub const TAU : f64 = PI * 2.0;
 
 impl Default for PendulumPlugin {
     fn default() -> PendulumPlugin {
@@ -107,15 +91,20 @@ impl Plugin for PendulumPlugin {
     }
 
     fn get_parameter_name(&self, param: i32) -> String {
-        format!("{:?}", ParamIndices::from_i32(param))
+        format!("{:?}", PendulumParams::from_index(param as _))
     }
 
     fn get_parameter_text(&self, param: i32) -> String {
         let value = self.get_parameter(param);
 
-        match ParamIndices::from_i32(param) {
-            ParamIndices::Osc1Waveform => Self::wave_name(value),
-            ParamIndices::Osc2Waveform => Self::wave_name(value),
+        match PendulumParams::from_index(param as _) {
+            PendulumParams::Osc1Waveform => format!("{:?}", Dynamic::from_param(value)),
+            PendulumParams::Osc2Waveform => format!("{:?}", Dynamic::from_param(value)),
+            PendulumParams::Osc3Waveform => format!("{:?}", Dynamic::from_param(value)),
+            PendulumParams::Osc1RatioCoarse => format!("{}", (value * 32.99).floor()),
+            PendulumParams::Osc2RatioCoarse => format!("{}", (value * 32.99).floor()),
+            PendulumParams::Osc3RatioCoarse => format!("{}", (value * 32.99).floor()),
+            PendulumParams::Osc3AM => format!("{:?}", value > 0.5),
             _ => format!("{:.3}", value),
         }
     }

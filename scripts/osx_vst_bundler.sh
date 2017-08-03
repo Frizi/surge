@@ -12,7 +12,6 @@ else
     rm -r "$1.vst/Contents/MacOS"
     # Make the bundle folder
     mkdir -p "$1.vst/Contents/MacOS"
-    # cp "~/.multirust/toolchains/stable-x86_64-apple-darwin/lib/libstd-438eba4cd7d88a45.dylib" $1.vst/Contents/MacOS"
 
     # Create the PkgInfo
     echo "BNDL????" > "$1.vst/Contents/PkgInfo"

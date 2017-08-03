@@ -1,7 +1,8 @@
 use device::*;
 use helpers;
+use IndexedEnum;
 
-#[derive(Debug)]
+#[derive(Debug, IndexedEnum)]
 pub enum ParamIndices {
     Osc1Waveform = 0,
     Osc1RatioCoarse,
@@ -33,54 +34,13 @@ pub enum ParamIndices {
     VibratoFreq,
     VibratoAmount,
     Rise,
-
-    #[allow(non_camel_case_types)]
-    LAST_PARAM
-}
-
-impl ParamIndices {
-    pub fn from_i32 (num: i32) -> ParamIndices {
-        match num {
-            0 => ParamIndices::Osc1Waveform,
-            1 => ParamIndices::Osc1RatioCoarse,
-            2 => ParamIndices::Osc1RatioFine,
-            3 => ParamIndices::Osc1Feedback,
-            4 => ParamIndices::Osc1FeedForward,
-
-            5 => ParamIndices::Osc1Attack,
-            6 => ParamIndices::Osc1Decay,
-            7 => ParamIndices::Osc1Sustain,
-            8 => ParamIndices::Osc1Release,
-
-            9 => ParamIndices::Osc2Waveform,
-            10 => ParamIndices::Osc2RatioCoarse,
-            11 => ParamIndices::Osc2RatioFine,
-            12 => ParamIndices::Osc2Feedbsck,
-
-            13 => ParamIndices::Osc2Attack,
-            14 => ParamIndices::Osc2Decay,
-            15 => ParamIndices::Osc2Sustain,
-            16 => ParamIndices::Osc2Release,
-
-            17 => ParamIndices::MasterLevel,
-
-            18 => ParamIndices::VoicesUnisono,
-            19 => ParamIndices::VoicesDetune,
-            20 => ParamIndices::VoicesPan,
-
-            21 => ParamIndices::VibratoFreq,
-            22 => ParamIndices::VibratoAmount,
-            23 => ParamIndices::Rise,
-            _ => panic!("Invalid param index {}", num)
-        }
-    }
 }
 
 pub struct Fermi {
     time: f64,
     note_duration: f64,
     note: Option<u8>,
-    params: [f32; ParamIndices::LAST_PARAM as usize]
+    params: [f32; ParamIndices::NUM_ITEMS as usize]
 }
 
 impl Default for Fermi {

@@ -1,0 +1,17 @@
+[package]
+name = "surgemachine_dylib"
+version = "0.1.0"
+authors = ["Frizi <frizi09@gmail.com>"]
+
+[lib]
+name = "surgemachine"
+crate-type = ["cdylib"]
+
+[dependencies]
+surgemachine = { path = "../surgemachine" }
+
+[profile.release]
+lto = true
+debug-assertions = false
+panic = 'abort'
+opt-level = 's'

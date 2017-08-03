@@ -1,7 +1,9 @@
 [workspace]
 members = [
-    "libsurgemachine",
-    "surgemachinevst"
+    "surgemachine",
+    "surgemachine-macros",
+    "surgemachine-cdylib",
+    "surgemachine-vst"
 ]
 
 [profile.dev]

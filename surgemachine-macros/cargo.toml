@@ -1,10 +1,11 @@
 [package]
-name = "libsurgemachine"
+name = "surgemachine_macros"
 version = "0.1.0"
 authors = ["Frizi <frizi09@gmail.com>"]
 
 [lib]
-name = "surgemachine"
-crate-type = ["cdylib", "lib"]
+proc-macro = true
 
 [dependencies]
+syn = "0.11.9"
+quote = "0.3"

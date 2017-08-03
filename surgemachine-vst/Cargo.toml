@@ -7,8 +7,6 @@ authors = ["Frizi <frizi09@gmail.com>"]
 name = "pendulum"
 crate-type = ["cdylib"]
 
-[dependencies.vst2]
-git = "https://github.com/overdrivenpotato/rust-vst2"
-
-[dependencies.libsurgemachine]
-path = "../libsurgemachine"
+[dependencies]
+vst2 = { git = "https://github.com/overdrivenpotato/rust-vst2" }
+surgemachine = { path = "../surgemachine" }

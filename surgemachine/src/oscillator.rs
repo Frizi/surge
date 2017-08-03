@@ -1,9 +1,9 @@
-use waveform;
+use waveform::*;
 
 pub struct Oscillator {
     phase: f64,
     frequency: f64,
-    wave: Box<waveform::Waveform>
+    wave: Dynamic
 }
 
 impl Default for Oscillator {
@@ -11,7 +11,7 @@ impl Default for Oscillator {
         Oscillator {
             phase: 0.0,
             frequency: 0.0,
-            wave: Box::new(waveform::Sine)
+            wave: Dynamic::Sine
         }
     }
 }
@@ -25,11 +25,15 @@ impl Oscillator {
         self.frequency = freq;
     }
 
-    pub fn get_value (&self) -> f64 {
+    pub fn get_value (&self) -> f32 {
         self.wave.value_at_phase(self.phase)
     }
 
-    pub fn set_wave(&mut self, wave: Box<waveform::Waveform>) -> () {
+    pub fn get_offset_value (&self, phase_offset: f64) -> f32 {
+        self.wave.value_at_phase((self.phase + phase_offset).fract())
+    }
+
+    pub fn set_wave(&mut self, wave: Dynamic) -> () {
         self.wave = wave
     }
 }

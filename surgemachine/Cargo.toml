@@ -1,0 +1,12 @@
+[package]
+name = "surgemachine"
+version = "0.1.0"
+authors = ["Frizi <frizi09@gmail.com>"]
+
+[lib]
+name = "surgemachine"
+crate-type = ["rlib"]
+
+[dependencies]
+surgemachine_macros = { path = "../surgemachine-macros" }
+rand = "0.3"
