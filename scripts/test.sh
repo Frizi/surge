@@ -2,4 +2,7 @@
 set -e
 cd `dirname $0`/..
 
-./scripts/mrswatson64 --midi-file arp.mid --output output.wav --plugin Pendulum.vst
+mkdir -p tmp
+
+./scripts/mrswatson64 --midi-file testdata/arp.mid --output tmp/arp.wav --plugin Pendulum.vst
+./scripts/mrswatson64 --midi-file testdata/lownote.mid --output tmp/lownote.wav --plugin Pendulum.vst,testdata/pure_saw.fxp

@@ -11,7 +11,7 @@ use surgemachine::waveform::{Dynamic};
 use surgemachine::device::{Device};
 
 struct PendulumPlugin {
-    sample_rate: f64,
+    sample_rate: f32,
     device: Option<Box<Device>>,
 }
 
@@ -104,13 +104,16 @@ impl Plugin for PendulumPlugin {
             PendulumParams::Osc1RatioCoarse => format!("{}", (value * 32.99).floor()),
             PendulumParams::Osc2RatioCoarse => format!("{}", (value * 32.99).floor()),
             PendulumParams::Osc3RatioCoarse => format!("{}", (value * 32.99).floor()),
+            PendulumParams::Osc1Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
+            PendulumParams::Osc2Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
+            PendulumParams::Osc3Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
             PendulumParams::Osc3AM => format!("{:?}", value > 0.5),
             _ => format!("{:.3}", value),
         }
     }
 
     fn set_sample_rate(&mut self, rate: f32) {
-        self.sample_rate = rate as f64;
+        self.sample_rate = rate;
     }
 
     fn process(&mut self, buffer: AudioBuffer<f32>) {

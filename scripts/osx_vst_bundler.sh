@@ -9,7 +9,7 @@ if [[ -z $1 || -z $2 ]]; then
     echo -e "\t$0 Plugin target/release/plugin.dylib"
     echo -e "\tCreates a Plugin.vst bundle"
 else
-    rm -r "$1.vst/Contents/MacOS"
+    rm -rf "$1.vst/Contents/MacOS"
     # Make the bundle folder
     mkdir -p "$1.vst/Contents/MacOS"
 

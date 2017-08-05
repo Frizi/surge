@@ -37,8 +37,8 @@ pub enum ParamIndices {
 }
 
 pub struct Fermi {
-    time: f64,
-    note_duration: f64,
+    time: f32,
+    note_duration: f32,
     note: Option<u8>,
     params: [f32; ParamIndices::NUM_ITEMS as usize]
 }
@@ -103,7 +103,7 @@ impl Device for Fermi {
             let attack = self.param(ParamIndices::Osc1Attack) as f64;
 
             for output_buffer in outputs.iter_mut() {
-                let mut i : u64 = 0;
+                let mut i : u32 = 0;
 
                 for output_sample in output_buffer.iter_mut() {
                      let extra_time = total_time * (i as f64) / samples as f64;

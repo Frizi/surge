@@ -6,6 +6,7 @@
 #[macro_use] mod params_macros;
 
 extern crate rand;
+extern crate smallvec;
 
 pub mod device;
 pub mod waveform;
@@ -14,18 +15,19 @@ mod envelope;
 mod helpers;
 mod oscillator;
 mod pendulum;
+mod frame;
 
 use device::*;
 
 pub use pendulum::PendulumParams;
 
 pub trait IndexedEnum {
-    const NUM_ITEMS: u64;
-    fn to_index(&self) -> u64;
-    fn from_index(index: u64) -> Self;
+    const NUM_ITEMS: u32;
+    fn to_index(&self) -> u32;
+    fn from_index(index: u32) -> Self;
     fn from_param(val: f32) -> Self where Self: Sized {
         let num = Self::NUM_ITEMS;
-        let index = (val * (num as f32)).floor() as u64;
+        let index = (val * (num as f32)).floor() as u32;
         let bound_index = std::cmp::max(0, std::cmp::min(num - 1, index));
         Self::from_index(bound_index)
     }

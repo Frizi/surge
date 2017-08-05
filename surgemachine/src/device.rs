@@ -7,7 +7,7 @@ pub trait Device {
     fn note_on (&mut self, note: u8, velocity: u8);
     fn note_off (&mut self, note: u8, velocity: u8);
 
-    fn set_sample_rate(&mut self, sample_rate: f64);
+    fn set_sample_rate(&mut self, sample_rate: f32);
     fn get_parameter(&self, index: i32) -> f32;
     fn set_parameter(&mut self, index: i32, val: f32);
     fn get_num_parameters(&self) -> i32;

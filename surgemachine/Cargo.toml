@@ -10,3 +10,4 @@ crate-type = ["rlib"]
 [dependencies]
 surgemachine_macros = { path = "../surgemachine-macros" }
 rand = "0.3"
+smallvec = "0.4"

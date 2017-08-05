@@ -1,8 +1,8 @@
 use waveform::*;
 
 pub struct Oscillator {
-    phase: f64,
-    frequency: f64,
+    pub phase: f32,
+    frequency: f32,
     wave: Dynamic
 }
 
@@ -17,19 +17,22 @@ impl Default for Oscillator {
 }
 
 impl Oscillator {
-    pub fn step (&mut self, timestep: f64) -> () {
+    #[inline]
+    pub fn step (&mut self, timestep: f32) -> () {
         self.phase = (self.phase + timestep * self.frequency).fract();
     }
 
-    pub fn set_freq(&mut self, freq: f64) -> () {
+    pub fn set_freq(&mut self, freq: f32) -> () {
         self.frequency = freq;
     }
 
+    #[inline]
     pub fn get_value (&self) -> f32 {
         self.wave.value_at_phase(self.phase)
     }
 
-    pub fn get_offset_value (&self, phase_offset: f64) -> f32 {
+    #[inline]
+    pub fn get_offset_value (&self, phase_offset: f32) -> f32 {
         self.wave.value_at_phase((self.phase + phase_offset).fract())
     }
 

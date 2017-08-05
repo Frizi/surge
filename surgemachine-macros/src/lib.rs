@@ -16,12 +16,12 @@ pub fn choose_enum(input: TokenStream) -> TokenStream {
 fn impl_choose_enum(ast: &syn::DeriveInput) -> quote::Tokens {
     let name = &ast.ident;
     if let syn::Body::Enum(ref body) = ast.body {
-        let num_items = body.len() as u64;
+        let num_items = body.len() as u32;
         let (from_index_cases, to_index_cases): (Vec<_>, Vec<_>) = body.iter().enumerate()
             .map(|(i, case)| {
                 let unqualified_ident = &case.ident;
                 let ident = quote! { #name::#unqualified_ident };
-                let index = i as u64;
+                let index = i as u32;
 
                 let index_to_ident = match case.data {
                     syn::VariantData::Unit => quote! { #index => #ident },
@@ -38,13 +38,13 @@ fn impl_choose_enum(ast: &syn::DeriveInput) -> quote::Tokens {
 
         quote! {
             impl IndexedEnum for #name {
-                const NUM_ITEMS: u64 = #num_items;
-                fn to_index (&self) -> u64 {
+                const NUM_ITEMS: u32 = #num_items;
+                fn to_index (&self) -> u32 {
                     match *self {
                         #(#to_index_cases),*,
                     }
                 }
-                fn from_index(index: u64) -> Self {
+                fn from_index(index: u32) -> Self {
                     match index {
                         #(#from_index_cases),*,
                         _ => panic!("Invalid index {} for {}", index, stringify!(#name))
@@ -68,18 +68,18 @@ fn test_choose_enum () {
 
     let expected = quote! {
         impl IndexedEnum for TestEnum {
-            const NUM_ITEMS: u64 = 2u64;
-            fn to_index (&self) -> u64 {
+            const NUM_ITEMS: u32 = 2u32;
+            fn to_index (&self) -> u32 {
                 match *self {
-                    TestEnum::One => 0u64,
-                    TestEnum::Two => 1u64,
+                    TestEnum::One => 0u32,
+                    TestEnum::Two => 1u32,
                 }
             }
 
-            fn from_index(index: u64) -> Self {
+            fn from_index(index: u32) -> Self {
                 match index {
-                    0u64 => TestEnum::One,
-                    1u64 => TestEnum::Two,
+                    0u32 => TestEnum::One,
+                    1u32 => TestEnum::Two,
                     _ => panic!("Invalid index {} for {}", index, stringify!(TestEnum))
                 }
             }

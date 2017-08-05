@@ -5,6 +5,8 @@ use envelope::Envelope;
 use oscillator::Oscillator;
 use waveform::*;
 use IndexedEnum;
+use frame::Frame;
+use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, IndexedEnum)]
 pub enum PendulumParams {
@@ -50,17 +52,17 @@ pub enum PendulumParams {
 
 define_params_bag!(PendulumParamsBag, PendulumParams, [
     0.0, 0.0, 0.0, 0.0, // osc1
-    0.5, 0.0, 0.0, 0.5, // osc2
-    0.0, 0.0, 0.0, 0.0, // osc3
-    0.2, 0.0, 1.0, 0.2, // osc1 envelope
-    0.2, 0.0, 1.0, 0.2, // osc2 envelope
-    0.2, 0.0, 1.0, 0.2, // osc3 envelope
-    0.0, 0.0, 0.0, 0.0, // detunes + am
+    0.3, 0.0, 0.0, 1.0, // osc2
+    1.0, 0.0, 0.0, 0.0, // osc3
+    0.2, 0.1, 1.0, 0.2, // osc1 envelope
+    0.1, 0.1, 1.0, 0.2, // osc2 envelope
+    0.01, 0.1, 0.0, 0.1, // osc3 envelope
+    0.5, 0.5, 0.5, 0.0, // detunes + am
     1.0, 1.0, 0.5, // levels
 ]);
 
 pub struct Pendulum {
-    sample_rate: f64,
+    sample_rate: f32,
     voices: [PendulumVoice; 8],
     params: PendulumParamsBag,
     voice_cycle: u8
@@ -80,33 +82,33 @@ impl Default for Pendulum {
 
 impl Pendulum {
     fn setup_envelope_1(&mut self) {
-        let a = self.params.get(PendulumParams::Osc1Attack) as f64;
-        let d = self.params.get(PendulumParams::Osc1Decay) as f64;
-        let s = self.params.get(PendulumParams::Osc1Sustain) as f64;
-        let r = self.params.get(PendulumParams::Osc1Release) as f64;
-        for voice in self.voices.iter_mut() {
+        let a = self.params.get(PendulumParams::Osc1Attack);
+        let d = self.params.get(PendulumParams::Osc1Decay);
+        let s = self.params.get(PendulumParams::Osc1Sustain);
+        let r = self.params.get(PendulumParams::Osc1Release);
+        for voice in &mut self.voices {
             let rate = self.sample_rate;
             voice.osc1.envelope.set_adsr(rate, a, d, s, r);
         }
     }
 
     fn setup_envelope_2(&mut self) {
-        let a = self.params.get(PendulumParams::Osc2Attack) as f64;
-        let d = self.params.get(PendulumParams::Osc2Decay) as f64;
-        let s = self.params.get(PendulumParams::Osc2Sustain) as f64;
-        let r = self.params.get(PendulumParams::Osc2Release) as f64;
-        for voice in self.voices.iter_mut() {
+        let a = self.params.get(PendulumParams::Osc2Attack);
+        let d = self.params.get(PendulumParams::Osc2Decay);
+        let s = self.params.get(PendulumParams::Osc2Sustain);
+        let r = self.params.get(PendulumParams::Osc2Release);
+        for voice in &mut self.voices {
             let rate = self.sample_rate;
             voice.osc2.envelope.set_adsr(rate, a, d, s, r);
         }
     }
 
     fn setup_envelope_3(&mut self) {
-        let a = self.params.get(PendulumParams::Osc3Attack) as f64;
-        let d = self.params.get(PendulumParams::Osc3Decay) as f64;
-        let s = self.params.get(PendulumParams::Osc3Sustain) as f64;
-        let r = self.params.get(PendulumParams::Osc3Release) as f64;
-        for voice in self.voices.iter_mut() {
+        let a = self.params.get(PendulumParams::Osc3Attack);
+        let d = self.params.get(PendulumParams::Osc3Decay);
+        let s = self.params.get(PendulumParams::Osc3Sustain);
+        let r = self.params.get(PendulumParams::Osc3Release);
+        for voice in &mut self.voices {
             let rate = self.sample_rate;
             voice.osc3.envelope.set_adsr(rate, a, d, s, r);
         }
@@ -116,13 +118,10 @@ impl Pendulum {
         let w1 = Dynamic::from_param(self.params.get(PendulumParams::Osc1Waveform));
         let w2 = Dynamic::from_param(self.params.get(PendulumParams::Osc2Waveform));
         let w3 = Dynamic::from_param(self.params.get(PendulumParams::Osc3Waveform));
-        for voice in self.voices.iter_mut() {
-            voice.osc1.osc_l.set_wave(w1);
-            voice.osc1.osc_r.set_wave(w1);
-            voice.osc2.osc_l.set_wave(w2);
-            voice.osc2.osc_r.set_wave(w2);
-            voice.osc3.osc_l.set_wave(w3);
-            voice.osc3.osc_r.set_wave(w3);
+        for voice in &mut self.voices {
+            voice.osc1.set_wave(w1);
+            voice.osc2.set_wave(w2);
+            voice.osc3.set_wave(w3);
         }
     }
 
@@ -149,74 +148,65 @@ trait Voice<T> {
     fn note_on(&mut self, note: u8, _velocity: u8);
     fn note_off(&mut self, note: u8, _velocity: u8);
     fn init_process(&mut self, &T) -> bool { true }
-    fn process_sample(&mut self, timestep: f64) -> (f32, f32);
+    fn process_sample(&mut self, timestep: f32) -> Frame;
     fn is_finished (&self) -> bool;
 }
 
 impl Voice<PendulumParamsBag> for PendulumVoice {
     fn current_note (&self) -> Option<u8> { self.current_note }
     fn is_finished (&self) -> bool {
-        self.osc1.envelope.is_finished() &&
-        self.osc2.envelope.is_finished() &&
-        self.osc3.envelope.is_finished()
+        self.osc1.is_finished() &&
+        self.osc2.is_finished() &&
+        self.osc3.is_finished()
     }
 
     fn note_on(&mut self, note: u8, _velocity: u8) {
         self.current_note = Some(note);
-        self.osc1.osc_l.phase_reset();
-        self.osc1.osc_r.phase_reset();
-        self.osc2.osc_l.phase_reset();
-        self.osc2.osc_r.phase_reset();
-        self.osc3.osc_l.phase_reset();
-        self.osc3.osc_r.phase_reset();
-        self.osc1.envelope.trigger();
-        self.osc2.envelope.trigger();
-        self.osc3.envelope.trigger();
+        self.osc1.trigger();
+        self.osc2.trigger();
+        self.osc3.trigger();
     }
 
     fn note_off(&mut self, _note: u8, _velocity: u8) {
         self.current_note = None;
-        self.osc1.envelope.release();
-        self.osc2.envelope.release();
-        self.osc3.envelope.release();
+        self.osc1.release();
+        self.osc2.release();
+        self.osc3.release();
     }
 
     fn init_process(&mut self, params: &PendulumParamsBag) -> bool {
         match self.current_note {
             Some(note) => {
-                let note_freq = helpers::midi_note_to_hz(note);
+                let note_freq : f32 = helpers::midi_note_to_hz(note);
 
-                let osc1freq = note_freq * helpers::ratio_scalar(
-                    params.get(PendulumParams::Osc1RatioCoarse) as f64,
-                    params.get(PendulumParams::Osc1RatioFine) as f64
+                let freq1 = note_freq * helpers::ratio_scalar(
+                    params.get(PendulumParams::Osc1RatioCoarse),
+                    params.get(PendulumParams::Osc1RatioFine),
                 );
-                let osc2freq = note_freq * helpers::ratio_scalar(
-                    params.get(PendulumParams::Osc2RatioCoarse) as f64,
-                    params.get(PendulumParams::Osc2RatioFine) as f64
+                let freq2 = note_freq * helpers::ratio_scalar(
+                    params.get(PendulumParams::Osc2RatioCoarse),
+                    params.get(PendulumParams::Osc2RatioFine)
                 );
-                let osc3freq = note_freq * helpers::ratio_scalar(
-                    params.get(PendulumParams::Osc3RatioCoarse) as f64,
-                    params.get(PendulumParams::Osc3RatioFine) as f64
+                let freq3 = note_freq * helpers::ratio_scalar(
+                    params.get(PendulumParams::Osc3RatioCoarse),
+                    params.get(PendulumParams::Osc3RatioFine)
                 );
 
-                let detune1 = (params.get(PendulumParams::Osc1Detune) as f64) * 0.02 - 0.01 + 1.0;
-                let detune2 = (params.get(PendulumParams::Osc2Detune) as f64) * 0.02 - 0.01 + 1.0;
-                let detune3 = (params.get(PendulumParams::Osc3Detune) as f64) * 0.02 - 0.01 + 1.0;
+                let detune1 = (params.get(PendulumParams::Osc1Detune) - 0.5) * 0.02 + 1.0;
+                let detune2 = (params.get(PendulumParams::Osc2Detune) - 0.5) * 0.02 + 1.0;
+                let detune3 = (params.get(PendulumParams::Osc3Detune) - 0.5) * 0.02 + 1.0;
 
-                self.osc1.phase_offset = (params.get(PendulumParams::Osc1PhaseOffset) as f64) * 0.5;
-                self.osc2.phase_offset = (params.get(PendulumParams::Osc2PhaseOffset) as f64) * 0.5;
-                self.osc3.phase_offset = (params.get(PendulumParams::Osc3PhaseOffset) as f64) * 0.5;
+                let phase_offset1 = params.get(PendulumParams::Osc1PhaseOffset);
+                let phase_offset2 = params.get(PendulumParams::Osc2PhaseOffset);
+                let phase_offset3 = params.get(PendulumParams::Osc3PhaseOffset);
 
                 self.osc2_level = params.get(PendulumParams::Osc2Level);
                 self.osc3_level = params.get(PendulumParams::Osc3Level);
                 self.osc3_am = params.get(PendulumParams::Osc3AM) > 0.5;
 
-                self.osc1.osc_l.set_freq(osc1freq / detune1);
-                self.osc1.osc_r.set_freq(osc1freq * detune1);
-                self.osc2.osc_l.set_freq(osc2freq / detune2);
-                self.osc2.osc_r.set_freq(osc2freq * detune2);
-                self.osc3.osc_l.set_freq(osc3freq / detune3);
-                self.osc3.osc_r.set_freq(osc3freq * detune3);
+                self.osc1.setup(freq1, detune1, phase_offset1);
+                self.osc2.setup(freq2, detune2, phase_offset2);
+                self.osc3.setup(freq3, detune3, phase_offset3);
 
                 true
             }
@@ -224,23 +214,28 @@ impl Voice<PendulumParamsBag> for PendulumVoice {
         }
     }
 
-    fn process_sample(&mut self, timestep: f64) -> (f32, f32) {
+    #[inline]
+    fn process_sample(&mut self, timestep: f32) -> Frame {
         let s1 = self.osc1.process_sample(timestep);
-        let s2 = self.osc2.process_sample(timestep);
-        let s3 = self.osc3.process_sample(timestep);
-        let l = s1.0 + self.osc2_level * s2.0;
-        let r = s1.1 + self.osc2_level * s2.1;
+        let s2 = self.osc2.process_sample(timestep) * self.osc2_level;
+        let s3 = self.osc3.process_sample(timestep) * self.osc3_level;
 
         if self.osc3_am {
-            let l = l * self.osc3_level * s3.0;
-            let r = r * self.osc3_level * s3.1;
-            (l, r)
+            (s1 + s2) * s3
         } else {
-            let l = l + self.osc3_level * s3.0;
-            let r = r + self.osc3_level * s3.1;
-            (l, r)
+            s1 + s2 + s3
         }
     }
+}
+
+enum PendulumOscMode {
+    Mono,
+    MonoOffset,
+    Stereo
+}
+
+impl Default for PendulumOscMode {
+    fn default () -> Self { PendulumOscMode::Mono }
 }
 
 #[derive(Default)]
@@ -248,20 +243,82 @@ struct PendulumOsc {
     envelope: ADSREnvelope,
     osc_l: Oscillator,
     osc_r: Oscillator,
-    phase_offset: f64,
+    phase_offset: f32,
+    osc_mode: PendulumOscMode
 }
 
 impl PendulumOsc {
-    fn process_sample(&mut self, timestep: f64) -> (f32, f32) {
-        let env = self.envelope.get_value() as f32;
-        let signal_l = env * self.osc_l.get_value();
-        let signal_r = env * self.osc_r.get_offset_value(self.phase_offset);
-
+    #[inline]
+    fn process_sample(&mut self, timestep: f32) -> Frame {
+        let env = self.envelope.get_value();
         self.envelope.process();
-        self.osc_l.step(timestep);
-        self.osc_r.step(timestep);
+        match self.osc_mode {
+            PendulumOscMode::Mono => {
+                let val = self.osc_l.get_value();
+                let f = Frame {
+                    l: val,
+                    r: val,
+                } * env;
+                self.osc_l.step(timestep);
+                f
+            },
+            PendulumOscMode::MonoOffset => {
+                let f = Frame {
+                    l: self.osc_l.get_value(),
+                    r: self.osc_l.get_offset_value(self.phase_offset),
+                } * env;
+                self.osc_l.step(timestep);
+                f
+            }
 
-        (signal_l, signal_r)
+            PendulumOscMode::Stereo => {
+                let f = Frame {
+                    l: self.osc_l.get_value(),
+                    r: self.osc_r.get_offset_value(self.phase_offset),
+                } * env;
+                self.osc_l.step(timestep);
+                self.osc_r.step(timestep);
+                f
+            }
+        }
+    }
+
+    fn set_wave(&mut self, wave: Dynamic) {
+        self.osc_l.set_wave(wave);
+        self.osc_r.set_wave(wave);
+    }
+
+    fn trigger(&mut self) {
+        self.envelope.trigger();
+        self.osc_l.phase_reset();
+        self.osc_r.phase_reset();
+    }
+
+    fn setup(&mut self, freq : f32, detune : f32, phase_offset : f32) {
+        self.phase_offset = phase_offset;
+        let detune_off =  (1.0 - detune.abs()) < 0.001;
+
+        if detune_off {
+            self.osc_l.set_freq(freq);
+            self.osc_r.set_freq(freq);
+            self.osc_mode = if phase_offset == 0.0 {
+                PendulumOscMode::Mono
+            } else {
+                PendulumOscMode::MonoOffset
+            };
+        } else {
+            self.osc_l.set_freq(freq / detune);
+            self.osc_r.set_freq(freq * detune);
+            self.osc_mode = PendulumOscMode::Stereo;
+        }
+    }
+
+    fn release(&mut self) {
+        self.envelope.release();
+    }
+
+    fn is_finished(&self) -> bool {
+        self.envelope.is_finished()
     }
 }
 
@@ -269,7 +326,7 @@ impl Device for Pendulum {
     fn get_num_parameters (&self) -> i32 { PendulumParams::NUM_ITEMS as i32 }
 
     fn get_parameter (&self, index: i32) -> f32 {
-        let param = PendulumParams::from_index(index as u64);
+        let param = PendulumParams::from_index(index as u32);
         let val = self.params.get(param);
 
         match param {
@@ -280,7 +337,7 @@ impl Device for Pendulum {
     }
 
     fn set_parameter (&mut self, index: i32, value: f32) {
-        let param = PendulumParams::from_index(index as u64);
+        let param = PendulumParams::from_index(index as u32);
         self.params.set(param, value);
         match param {
             PendulumParams::Osc1Attack => self.setup_envelope_1(),
@@ -305,41 +362,36 @@ impl Device for Pendulum {
         };
     }
 
-    fn set_sample_rate (&mut self, sample_rate: f64) {
+    fn set_sample_rate (&mut self, sample_rate: f32) {
         self.sample_rate = sample_rate;
         self.setup_envelope_1();
         self.setup_envelope_2();
+        self.setup_envelope_3();
     }
 
-    fn run<'a> (&mut self, mut outputs : AudioBus<'a, f32>) {
+    fn run (&mut self, mut outputs : AudioBus<f32>) {
         let timestep = helpers::time_per_sample(self.sample_rate);
 
         if !self.is_finished() {
             let master = self.params.get(PendulumParams::MasterLevel);
-            //
-            // let offset1 = (self.param(PendulumParams::Osc1PhaseOffset) * 0.5) as f64;
-            // let offset2 = (self.param(PendulumParams::Osc2PhaseOffset) * 0.5) as f64;
-
             let params = &self.params;
 
-            let mut active_voices = vec!();
+
+            let mut active_voices : SmallVec<[&mut PendulumVoice; 8]> = Default::default();
+
             for voice in self.voices.iter_mut() {
                 if voice.init_process(&params) {
-                    active_voices.push(voice)
+                    active_voices.push(voice);
                 }
             }
 
             for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
-                let (signal_l, signal_r) = active_voices.iter_mut().fold((0.0, 0.0), |(l, r), voice| {
-                    let (vl, vr) = voice.process_sample(timestep);
-                    (l + vl, r + vr)
-                });
+                let signal = active_voices.iter_mut()
+                    .map(|voice| voice.process_sample(timestep))
+                    .sum::<Frame>() * master;
 
-                let signal_l = signal_l * master;
-                let signal_r = signal_r * master;
-
-                *left_sample = signal_l;
-                *right_sample = signal_r;
+                *left_sample = signal.l;
+                *right_sample = signal.r;
             }
         }
         else {

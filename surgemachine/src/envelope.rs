@@ -1,4 +1,3 @@
-#[derive(PartialEq)]
 enum ADSRState {
     Idle,
     Attack,
@@ -11,31 +10,30 @@ pub trait Envelope {
     fn process (&mut self) -> ();
     fn trigger (&mut self) -> ();
     fn release (&mut self) -> ();
-    fn get_value (&self) -> f64;
+    fn get_value (&self) -> f32;
     fn is_finished (&self) -> bool;
     fn reset (&mut self) -> ();
 }
 
 pub struct ADSREnvelope {
     state: ADSRState,
-    output: f64,
-    attack_rate: f64,
-    decay_rate: f64,
-    release_rate: f64,
-    attack_coef: f64,
-    decay_coef: f64,
-    release_coef: f64,
-    sustain_level: f64,
-    target_ratio_a: f64,
-    target_ratio_dr: f64,
-    attack_base: f64,
-    decay_base: f64,
-    release_base: f64,
+    output: f32,
+    attack_rate: f32,
+    decay_rate: f32,
+    release_rate: f32,
+    attack_coef: f32,
+    decay_coef: f32,
+    release_coef: f32,
+    sustain_level: f32,
+    target_ratio_a: f32,
+    target_ratio_dr: f32,
+    attack_base: f32,
+    decay_base: f32,
+    release_base: f32,
 }
 
 impl ADSREnvelope {
-    #[allow(dead_code)]
-    pub fn set_adsr (&mut self, sample_rate: f64, attack: f64, decay: f64, sustain: f64, release: f64) {
+    pub fn set_adsr (&mut self, sample_rate: f32, attack: f32, decay: f32, sustain: f32, release: f32) {
         self.target_ratio_a = 0.3;
         self.target_ratio_dr = 0.0001;
         self.sustain_level = sustain.min(1.0).max(0.0);
@@ -111,19 +109,25 @@ impl Envelope for ADSREnvelope {
         self.state = ADSRState::Release;
     }
 
-    fn is_finished (&self) -> bool { self.state == ADSRState::Idle }
+    fn is_finished (&self) -> bool {
+        match self.state {
+            ADSRState::Idle => true,
+            _ => false
+        }
+    }
 
     fn reset (&mut self) {
         self.state = ADSRState::Idle;
         self.output = 0.0;
     }
 
-    fn get_value (&self) -> f64 {
+    #[inline]
+    fn get_value (&self) -> f32 {
         self.output
     }
 }
 
-fn calc_coef(rate: f64, target_ratio: f64) -> f64 {
+fn calc_coef(rate: f32, target_ratio: f32) -> f32 {
     if rate <= 0.0 { 0.0 }
     else { (-((1.0 + target_ratio) / target_ratio).ln() / rate).exp() }
 }
