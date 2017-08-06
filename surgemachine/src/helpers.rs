@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use device::AudioBus;
+use std::f32::consts::E;
 
 pub fn fix_denormal (value: f32) -> f32 {
     return value
@@ -7,6 +8,18 @@ pub fn fix_denormal (value: f32) -> f32 {
 
 pub fn ratio_scalar (coarse: f32, fine: f32) -> f32 {
     return 1.0 + (coarse * 32.99).floor() + (fine).powf(2.0)
+}
+
+pub fn log_control (linear: f32) -> f32 {
+    (linear.exp() - 1.0) / (E - 1.0)
+}
+
+pub fn unit_to_db (unit: f32) -> f32 {
+    10.0 * unit.log(10.0)
+}
+
+pub fn control_to_db(linear: f32) -> f32 {
+    unit_to_db(log_control(linear))
 }
 
 pub fn midi_note_to_hz(note: u8) -> f32 {

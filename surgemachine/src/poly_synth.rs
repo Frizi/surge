@@ -2,27 +2,25 @@ use device::*;
 use smallvec::*;
 use voice::Voice;
 use params_bag::ParamsBag;
-use std::marker::PhantomData;
 use helpers;
 use frame::Frame;
+use IndexedEnum;
 
-pub struct PolySynth<E: ::IndexedEnum, B: ParamsBag<E> = ParamsBag<E>, V: Voice<E,B> = Voice<E,B>> {
+pub struct PolySynth<V: Voice> {
     sample_rate: f32,
     voices: [V; 8],
-    params: B,
+    params: V::Bag,
     voice_cycle: u8,
-    phantom_enum: PhantomData<E>
 }
 
-impl<E,B,V> Default for PolySynth<E,B,V>
+impl<V> Default for PolySynth<V>
     where
-        E: ::IndexedEnum,
-        B: ParamsBag<E> + Default,
-        V: Voice<E,B> + Default
+        V::Bag: Default,
+        V: Voice + Default
 {
     fn default() -> Self {
-        let bag : B = Default::default();
-        let mut voices : [V; 8] = Default::default();
+        let bag: V::Bag = Default::default();
+        let mut voices: [V; 8] = Default::default();
         for voice in voices.iter_mut() {
             voice.init(&bag, 1.0);
         }
@@ -31,17 +29,14 @@ impl<E,B,V> Default for PolySynth<E,B,V>
             voices: voices,
             params: bag,
             voice_cycle: 0,
-            phantom_enum: Default::default()
         }
     }
 }
 
-impl<E,B,V> PolySynth<E,B,V>
-    where E: ::IndexedEnum, B: ParamsBag<E>, V: Voice<E,B>
-{
-    fn init_process (&mut self) -> (&B, SmallVec<[&mut V; 8]>) {
+impl<V: Voice> PolySynth<V> {
+    fn init_process (&mut self) -> (&V::Bag, SmallVec<[&mut V; 8]>) {
         let params = &self.params;
-        let mut active_voices : SmallVec<[&mut V; 8]> = Default::default();
+        let mut active_voices: SmallVec<[&mut V; 8]> = Default::default();
         for voice in self.voices.iter_mut() {
             if voice.init_process(params) {
                 active_voices.push(voice);
@@ -57,28 +52,30 @@ impl<E,B,V> PolySynth<E,B,V>
     }
 }
 
-impl<E,B,V> Device for PolySynth<E,B,V>
-    where E: ::IndexedEnum + Copy, B: ParamsBag<E>, V: Voice<E,B>
+impl<V:Voice<Depth=f32>> Device for PolySynth<V>
+    where V::ParamsEnum: Copy
 {
     fn set_parameter (&mut self, index: i32, value: f32) {
-        let param = E::from_index(index as u32);
+        let param = V::ParamsEnum::from_index(index as u32);
         self.params.set(param, value);
         for voice in self.voices.iter_mut() {
             voice.update_param(&self.params, param, self.sample_rate)
         }
     }
 
-    fn run (&mut self, mut outputs : AudioBus<f32>) {
+    fn run (&mut self, mut outputs: AudioBus<f32>) {
         let timestep = helpers::time_per_sample(self.sample_rate);
+
         if !self.is_finished() {
-            // let master = self.params.get(PendulumParams::MasterLevel);
             let (params, mut active_voices) = self.init_process();
+            let postproc_data = V::prepare_post(params);
+
             for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
                 let signal = active_voices.iter_mut()
                     .map(|voice| voice.process_sample(timestep))
                     .sum::<Frame>();
 
-                let signal = V::process_post(params, signal);
+                let signal = V::process_post(&postproc_data, signal);
 
                 *left_sample = signal.l;
                 *right_sample = signal.r;
@@ -122,12 +119,13 @@ impl<E,B,V> Device for PolySynth<E,B,V>
         }
     }
 
-    fn get_num_parameters (&self) -> i32 {
-        E::NUM_ITEMS as i32
+    fn get_num_parameters (&self) -> i32
+    {
+        V::ParamsEnum::NUM_ITEMS as i32
     }
 
     fn get_parameter (&self, index: i32) -> f32 {
-        let param = E::from_index(index as u32);
+        let param = V::ParamsEnum::from_index(index as u32);
         self.params.get(param)
     }
 }

@@ -10,13 +10,15 @@ extern crate smallvec;
 
 pub mod device;
 pub mod waveform;
+pub mod helpers;
+
 mod poly_synth;
 mod voice;
 
 mod envelope;
-mod helpers;
 mod oscillator;
 mod pendulum;
+// mod fermi;
 mod frame;
 
 use device::*;
@@ -43,5 +45,6 @@ pub enum DeviceType {
 pub fn create_device (device_type: DeviceType) -> Box<Device> {
     match device_type {
         DeviceType::Pendulum => Box::new(pendulum::Pendulum::default()),
+        // DeviceType::Fermi => Box::new(fermi::Fermi::default()),
     }
 }

@@ -34,7 +34,7 @@ impl Waveform for Dynamic {
 }
 
 use std::f32::consts::PI;
-const TAU : f32 = 2.0 * PI;
+const TAU: f32 = 2.0 * PI;
 
 impl Waveform for Sine {
     #[inline]

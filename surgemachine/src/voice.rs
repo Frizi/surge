@@ -1,8 +1,13 @@
 use frame::Frame;
 use params_bag::ParamsBag;
 
-pub trait Voice<E: ::IndexedEnum, T:ParamsBag<E>, D=f32> {
-    fn init(&mut self, bag: &T, sample_rate : f32) {
+pub trait Voice {
+    type ParamsEnum: ::IndexedEnum;
+    type Bag: ParamsBag<Self::ParamsEnum>;
+    type PostParam;
+    type Depth;
+
+    fn init(&mut self, bag: &Self::Bag, sample_rate: f32) {
         bag.for_each(&mut |param, _| {
             self.update_param(bag, param, sample_rate);
         });
@@ -11,9 +16,10 @@ pub trait Voice<E: ::IndexedEnum, T:ParamsBag<E>, D=f32> {
     fn current_note (&self) -> Option<u8>;
     fn note_on(&mut self, note: u8, _velocity: u8);
     fn note_off(&mut self, note: u8, _velocity: u8);
-    fn init_process(&mut self, &T) -> bool { true }
-    fn process_sample(&mut self, timestep: f32) -> Frame<D>;
+    fn init_process(&mut self, &Self::Bag) -> bool { true }
+    fn process_sample(&mut self, timestep: f32) -> Frame<Self::Depth>;
     fn is_finished (&self) -> bool;
-    fn process_post (&T, f: Frame<D>) -> Frame<D> { f }
-    fn update_param (&mut self, &T, E, f32) {}
+    fn prepare_post (&Self::Bag) -> Self::PostParam;
+    fn process_post (&Self::PostParam, f: Frame<Self::Depth>) -> Frame<Self::Depth> { f }
+    fn update_param (&mut self, &Self::Bag, Self::ParamsEnum, f32) {}
 }

@@ -10,7 +10,7 @@ use voice::Voice;
 use poly_synth::PolySynth;
 
 type Bag = PendulumParamsBag;
-pub type Pendulum = PolySynth<PendulumParams, Bag, PendulumVoice>;
+pub type Pendulum = PolySynth<PendulumVoice>;
 
 #[derive(Debug, Clone, Copy, IndexedEnum)]
 pub enum PendulumParams {
@@ -74,6 +74,7 @@ pub struct PendulumVoice {
     osc2_level: f32,
     osc3_level: f32,
     osc3_am: bool,
+    velocity: f32,
 }
 
 impl PendulumVoice {
@@ -105,7 +106,12 @@ impl PendulumVoice {
     }
 }
 
-impl Voice<PendulumParams,Bag> for PendulumVoice {
+impl Voice for PendulumVoice {
+    type ParamsEnum = PendulumParams;
+    type Bag = Bag;
+    type PostParam = f32;
+    type Depth = f32;
+
     fn init (&mut self, params: &Bag, rate: f32) {
         self.setup_envelopes(params, rate);
         self.setup_waves(params);
@@ -118,8 +124,9 @@ impl Voice<PendulumParams,Bag> for PendulumVoice {
         self.osc3.is_finished()
     }
 
-    fn note_on(&mut self, note: u8, _velocity: u8) {
+    fn note_on(&mut self, note: u8, velocity: u8) {
         self.current_note = Some(note);
+        self.velocity = (velocity as f32 / 127.0).min(1.0);
         self.osc1.trigger();
         self.osc2.trigger();
         self.osc3.trigger();
@@ -131,15 +138,18 @@ impl Voice<PendulumParams,Bag> for PendulumVoice {
         self.osc2.release();
         self.osc3.release();
     }
+    fn prepare_post(params: &Bag) -> f32 {
+        helpers::log_control(params.get(PendulumParams::MasterLevel))
+    }
 
-    fn process_post(params: &Bag, frame: Frame) -> Frame {
-        frame * params.get(PendulumParams::MasterLevel)
+    fn process_post(data: &f32, frame: Frame) -> Frame {
+        frame * *data
     }
 
     fn init_process(&mut self, params: &Bag) -> bool {
         match self.current_note {
             Some(note) => {
-                let note_freq : f32 = helpers::midi_note_to_hz(note);
+                let note_freq: f32 = helpers::midi_note_to_hz(note);
 
                 let freq1 = note_freq * helpers::ratio_scalar(
                     params.get(PendulumParams::Osc1RatioCoarse),
@@ -162,8 +172,8 @@ impl Voice<PendulumParams,Bag> for PendulumVoice {
                 let phase_offset2 = params.get(PendulumParams::Osc2PhaseOffset);
                 let phase_offset3 = params.get(PendulumParams::Osc3PhaseOffset);
 
-                self.osc2_level = params.get(PendulumParams::Osc2Level);
-                self.osc3_level = params.get(PendulumParams::Osc3Level);
+                self.osc2_level = helpers::log_control(params.get(PendulumParams::Osc2Level));
+                self.osc3_level = helpers::log_control(params.get(PendulumParams::Osc3Level));
                 self.osc3_am = params.get(PendulumParams::Osc3AM) > 0.5;
 
                 self.osc1.setup(freq1, detune1, phase_offset1);
@@ -203,11 +213,11 @@ impl Voice<PendulumParams,Bag> for PendulumVoice {
         let s2 = self.osc2.process_sample(timestep) * self.osc2_level;
         let s3 = self.osc3.process_sample(timestep) * self.osc3_level;
 
-        if self.osc3_am {
+        (if self.osc3_am {
             (s1 + s2) * s3
         } else {
             s1 + s2 + s3
-        }
+        }) * self.velocity
     }
 }
 
@@ -277,7 +287,7 @@ impl PendulumOsc {
         self.osc_r.phase_reset();
     }
 
-    fn setup(&mut self, freq : f32, detune : f32, phase_offset : f32) {
+    fn setup(&mut self, freq: f32, detune: f32, phase_offset: f32) {
         self.phase_offset = phase_offset;
         let detune_off =  (1.0 - detune.abs()) < 0.001;
 

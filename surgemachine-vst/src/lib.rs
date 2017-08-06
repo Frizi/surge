@@ -9,6 +9,7 @@ use vst2::api::Supported;
 use surgemachine::{create_device, DeviceType, IndexedEnum, PendulumParams};
 use surgemachine::waveform::{Dynamic};
 use surgemachine::device::{Device};
+use surgemachine::helpers;
 
 struct PendulumPlugin {
     sample_rate: f32,
@@ -30,8 +31,8 @@ impl PendulumPlugin {
         self.device.as_mut()
             .map(|d| {
                 match data[0] {
-                    128 => d.note_off(data[1], 255),
-                    144 => d.note_on(data[1], 255),
+                    128 => d.note_off(data[1], data[2]),
+                    144 => d.note_on(data[1], data[2]),
                     _ => ()
                 };
             });
@@ -94,19 +95,31 @@ impl Plugin for PendulumPlugin {
         format!("{:?}", PendulumParams::from_index(param as _))
     }
 
+    fn get_parameter_label(&self, param: i32) -> String {
+        match PendulumParams::from_index(param as _) {
+            PendulumParams::Osc2Level |
+            PendulumParams::Osc3Level |
+            PendulumParams::MasterLevel => "dB".to_string(),
+            _ => "".to_string()
+        }
+    }
+
     fn get_parameter_text(&self, param: i32) -> String {
         let value = self.get_parameter(param);
 
         match PendulumParams::from_index(param as _) {
-            PendulumParams::Osc1Waveform => format!("{:?}", Dynamic::from_param(value)),
-            PendulumParams::Osc2Waveform => format!("{:?}", Dynamic::from_param(value)),
+            PendulumParams::Osc1Waveform |
+            PendulumParams::Osc2Waveform |
             PendulumParams::Osc3Waveform => format!("{:?}", Dynamic::from_param(value)),
-            PendulumParams::Osc1RatioCoarse => format!("{}", (value * 32.99).floor()),
-            PendulumParams::Osc2RatioCoarse => format!("{}", (value * 32.99).floor()),
+            PendulumParams::Osc1RatioCoarse |
+            PendulumParams::Osc2RatioCoarse |
             PendulumParams::Osc3RatioCoarse => format!("{}", (value * 32.99).floor()),
-            PendulumParams::Osc1Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
-            PendulumParams::Osc2Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
+            PendulumParams::Osc1Detune |
+            PendulumParams::Osc2Detune |
             PendulumParams::Osc3Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
+            PendulumParams::Osc2Level |
+            PendulumParams::Osc3Level |
+            PendulumParams::MasterLevel => format!("{:.0}", helpers::control_to_db(value)),
             PendulumParams::Osc3AM => format!("{:?}", value > 0.5),
             _ => format!("{:.3}", value),
         }
