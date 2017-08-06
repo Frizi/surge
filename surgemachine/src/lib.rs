@@ -3,13 +3,15 @@
 // extern crate alloc_system;
 
 #[macro_use] extern crate surgemachine_macros;
-#[macro_use] mod params_macros;
+#[macro_use] mod params_bag;
 
 extern crate rand;
 extern crate smallvec;
 
 pub mod device;
 pub mod waveform;
+mod poly_synth;
+mod voice;
 
 mod envelope;
 mod helpers;
@@ -41,6 +43,5 @@ pub enum DeviceType {
 pub fn create_device (device_type: DeviceType) -> Box<Device> {
     match device_type {
         DeviceType::Pendulum => Box::new(pendulum::Pendulum::default()),
-        // DeviceType::Fermi => Box::new(fermi::Fermi::default()),
     }
 }

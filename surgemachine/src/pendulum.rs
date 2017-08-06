@@ -1,4 +1,3 @@
-use device::*;
 use helpers;
 use envelope::ADSREnvelope;
 use envelope::Envelope;
@@ -6,7 +5,12 @@ use oscillator::Oscillator;
 use waveform::*;
 use IndexedEnum;
 use frame::Frame;
-use smallvec::SmallVec;
+use params_bag::ParamsBag;
+use voice::Voice;
+use poly_synth::PolySynth;
+
+type Bag = PendulumParamsBag;
+pub type Pendulum = PolySynth<PendulumParams, Bag, PendulumVoice>;
 
 #[derive(Debug, Clone, Copy, IndexedEnum)]
 pub enum PendulumParams {
@@ -61,79 +65,8 @@ define_params_bag!(PendulumParamsBag, PendulumParams, [
     1.0, 1.0, 0.5, // levels
 ]);
 
-pub struct Pendulum {
-    sample_rate: f32,
-    voices: [PendulumVoice; 8],
-    params: PendulumParamsBag,
-    voice_cycle: u8
-}
-
-
-impl Default for Pendulum {
-    fn default() -> Pendulum {
-        Pendulum {
-            sample_rate: 1.0,
-            voice_cycle: 0,
-            voices: Default::default(),
-            params: Default::default(),
-        }
-    }
-}
-
-impl Pendulum {
-    fn setup_envelope_1(&mut self) {
-        let a = self.params.get(PendulumParams::Osc1Attack);
-        let d = self.params.get(PendulumParams::Osc1Decay);
-        let s = self.params.get(PendulumParams::Osc1Sustain);
-        let r = self.params.get(PendulumParams::Osc1Release);
-        for voice in &mut self.voices {
-            let rate = self.sample_rate;
-            voice.osc1.envelope.set_adsr(rate, a, d, s, r);
-        }
-    }
-
-    fn setup_envelope_2(&mut self) {
-        let a = self.params.get(PendulumParams::Osc2Attack);
-        let d = self.params.get(PendulumParams::Osc2Decay);
-        let s = self.params.get(PendulumParams::Osc2Sustain);
-        let r = self.params.get(PendulumParams::Osc2Release);
-        for voice in &mut self.voices {
-            let rate = self.sample_rate;
-            voice.osc2.envelope.set_adsr(rate, a, d, s, r);
-        }
-    }
-
-    fn setup_envelope_3(&mut self) {
-        let a = self.params.get(PendulumParams::Osc3Attack);
-        let d = self.params.get(PendulumParams::Osc3Decay);
-        let s = self.params.get(PendulumParams::Osc3Sustain);
-        let r = self.params.get(PendulumParams::Osc3Release);
-        for voice in &mut self.voices {
-            let rate = self.sample_rate;
-            voice.osc3.envelope.set_adsr(rate, a, d, s, r);
-        }
-    }
-
-    fn setup_waves(&mut self) {
-        let w1 = Dynamic::from_param(self.params.get(PendulumParams::Osc1Waveform));
-        let w2 = Dynamic::from_param(self.params.get(PendulumParams::Osc2Waveform));
-        let w3 = Dynamic::from_param(self.params.get(PendulumParams::Osc3Waveform));
-        for voice in &mut self.voices {
-            voice.osc1.set_wave(w1);
-            voice.osc2.set_wave(w2);
-            voice.osc3.set_wave(w3);
-        }
-    }
-
-    fn is_finished (&self) -> bool {
-        self.voices.iter().fold(true, |acc, voice| {
-            acc && voice.is_finished()
-        })
-    }
-}
-
 #[derive(Default)]
-struct PendulumVoice {
+pub struct PendulumVoice {
     osc1: PendulumOsc,
     osc2: PendulumOsc,
     osc3: PendulumOsc,
@@ -143,16 +76,41 @@ struct PendulumVoice {
     osc3_am: bool,
 }
 
-trait Voice<T> {
-    fn current_note (&self) -> Option<u8>;
-    fn note_on(&mut self, note: u8, _velocity: u8);
-    fn note_off(&mut self, note: u8, _velocity: u8);
-    fn init_process(&mut self, &T) -> bool { true }
-    fn process_sample(&mut self, timestep: f32) -> Frame;
-    fn is_finished (&self) -> bool;
+impl PendulumVoice {
+    fn setup_envelopes(&mut self, params: &Bag, rate: f32) {
+        let a1 = params.get(PendulumParams::Osc1Attack);
+        let d1 = params.get(PendulumParams::Osc1Decay);
+        let s1 = params.get(PendulumParams::Osc1Sustain);
+        let r1 = params.get(PendulumParams::Osc1Release);
+        let a2 = params.get(PendulumParams::Osc2Attack);
+        let d2 = params.get(PendulumParams::Osc2Decay);
+        let s2 = params.get(PendulumParams::Osc2Sustain);
+        let r2 = params.get(PendulumParams::Osc2Release);
+        let a3 = params.get(PendulumParams::Osc3Attack);
+        let d3 = params.get(PendulumParams::Osc3Decay);
+        let s3 = params.get(PendulumParams::Osc3Sustain);
+        let r3 = params.get(PendulumParams::Osc3Release);
+        self.osc1.envelope.set_adsr(rate, a1, d1, s1, r1);
+        self.osc2.envelope.set_adsr(rate, a2, d2, s2, r2);
+        self.osc3.envelope.set_adsr(rate, a3, d3, s3, r3);
+    }
+
+    fn setup_waves(&mut self, params: &Bag) {
+        let w1 = Dynamic::from_param(params.get(PendulumParams::Osc1Waveform));
+        let w2 = Dynamic::from_param(params.get(PendulumParams::Osc2Waveform));
+        let w3 = Dynamic::from_param(params.get(PendulumParams::Osc3Waveform));
+        self.osc1.set_wave(w1);
+        self.osc2.set_wave(w2);
+        self.osc3.set_wave(w3);
+    }
 }
 
-impl Voice<PendulumParamsBag> for PendulumVoice {
+impl Voice<PendulumParams,Bag> for PendulumVoice {
+    fn init (&mut self, params: &Bag, rate: f32) {
+        self.setup_envelopes(params, rate);
+        self.setup_waves(params);
+    }
+
     fn current_note (&self) -> Option<u8> { self.current_note }
     fn is_finished (&self) -> bool {
         self.osc1.is_finished() &&
@@ -174,7 +132,11 @@ impl Voice<PendulumParamsBag> for PendulumVoice {
         self.osc3.release();
     }
 
-    fn init_process(&mut self, params: &PendulumParamsBag) -> bool {
+    fn process_post(params: &Bag, frame: Frame) -> Frame {
+        frame * params.get(PendulumParams::MasterLevel)
+    }
+
+    fn init_process(&mut self, params: &Bag) -> bool {
         match self.current_note {
             Some(note) => {
                 let note_freq : f32 = helpers::midi_note_to_hz(note);
@@ -212,6 +174,27 @@ impl Voice<PendulumParamsBag> for PendulumVoice {
             }
             _ => !self.is_finished()
         }
+    }
+
+    fn update_param(&mut self, bag: &Bag, param: PendulumParams, rate: f32) {
+        match param {
+            PendulumParams::Osc1Attack => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc1Decay => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc1Sustain => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc1Release => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc2Attack => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc2Decay => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc2Sustain => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc2Release => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc3Attack => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc3Decay => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc3Sustain => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc3Release => self.setup_envelopes(bag, rate),
+            PendulumParams::Osc1Waveform => self.setup_waves(bag),
+            PendulumParams::Osc2Waveform => self.setup_waves(bag),
+            PendulumParams::Osc3Waveform => self.setup_waves(bag),
+            _ => (),
+        };
     }
 
     #[inline]
@@ -319,117 +302,5 @@ impl PendulumOsc {
 
     fn is_finished(&self) -> bool {
         self.envelope.is_finished()
-    }
-}
-
-impl Device for Pendulum {
-    fn get_num_parameters (&self) -> i32 { PendulumParams::NUM_ITEMS as i32 }
-
-    fn get_parameter (&self, index: i32) -> f32 {
-        let param = PendulumParams::from_index(index as u32);
-        let val = self.params.get(param);
-
-        match param {
-            PendulumParams::Osc1RatioCoarse => (val * 32.99).floor() / 32.0,
-            PendulumParams::Osc2RatioCoarse => (val * 32.99).floor() / 32.0,
-            _ => val
-        }
-    }
-
-    fn set_parameter (&mut self, index: i32, value: f32) {
-        let param = PendulumParams::from_index(index as u32);
-        self.params.set(param, value);
-        match param {
-            PendulumParams::Osc1Attack => self.setup_envelope_1(),
-            PendulumParams::Osc1Decay => self.setup_envelope_1(),
-            PendulumParams::Osc1Sustain => self.setup_envelope_1(),
-            PendulumParams::Osc1Release => self.setup_envelope_1(),
-
-            PendulumParams::Osc2Attack => self.setup_envelope_2(),
-            PendulumParams::Osc2Decay => self.setup_envelope_2(),
-            PendulumParams::Osc2Sustain => self.setup_envelope_2(),
-            PendulumParams::Osc2Release => self.setup_envelope_2(),
-
-            PendulumParams::Osc3Attack => self.setup_envelope_3(),
-            PendulumParams::Osc3Decay => self.setup_envelope_3(),
-            PendulumParams::Osc3Sustain => self.setup_envelope_3(),
-            PendulumParams::Osc3Release => self.setup_envelope_3(),
-
-            PendulumParams::Osc1Waveform => self.setup_waves(),
-            PendulumParams::Osc2Waveform => self.setup_waves(),
-            PendulumParams::Osc3Waveform => self.setup_waves(),
-            _ => (),
-        };
-    }
-
-    fn set_sample_rate (&mut self, sample_rate: f32) {
-        self.sample_rate = sample_rate;
-        self.setup_envelope_1();
-        self.setup_envelope_2();
-        self.setup_envelope_3();
-    }
-
-    fn run (&mut self, mut outputs : AudioBus<f32>) {
-        let timestep = helpers::time_per_sample(self.sample_rate);
-
-        if !self.is_finished() {
-            let master = self.params.get(PendulumParams::MasterLevel);
-            let params = &self.params;
-
-
-            let mut active_voices : SmallVec<[&mut PendulumVoice; 8]> = Default::default();
-
-            for voice in self.voices.iter_mut() {
-                if voice.init_process(&params) {
-                    active_voices.push(voice);
-                }
-            }
-
-            for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
-                let signal = active_voices.iter_mut()
-                    .map(|voice| voice.process_sample(timestep))
-                    .sum::<Frame>() * master;
-
-                *left_sample = signal.l;
-                *right_sample = signal.r;
-            }
-        }
-        else {
-            for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
-                *left_sample = 0.0;
-                *right_sample = 0.0;
-            }
-        }
-    }
-
-    fn note_on(&mut self, note: u8, velocity: u8) {
-        match self.voices.iter_mut().nth(self.voice_cycle as _) {
-            Some(voice) => {
-                if voice.current_note() == None {
-                    voice.note_on(note, velocity);
-                    self.voice_cycle = (self.voice_cycle + 1) % 8;
-                    return;
-                }
-            },
-            _ => ()
-        };
-
-
-        for voice in self.voices.iter_mut() {
-            if voice.current_note() == None {
-                voice.note_on(note, velocity);
-                return;
-            }
-
-        }
-    }
-
-    fn note_off(&mut self, note: u8, velocity: u8) {
-        for voice in self.voices.iter_mut() {
-            if voice.current_note() == Some(note) {
-                voice.note_off(note, velocity);
-                break;
-            }
-        }
     }
 }
