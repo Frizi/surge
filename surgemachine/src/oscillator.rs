@@ -1,22 +1,23 @@
 use waveform::*;
 
-pub struct Oscillator {
-    pub phase: f32,
+pub struct Oscillator<W:Waveform=Dynamic> {
+    phase: f32,
     frequency: f32,
-    wave: Dynamic
+    wave: W
 }
 
-impl Default for Oscillator {
-    fn default () -> Oscillator {
-        Oscillator {
+impl<W: Waveform> Default for Oscillator<W>
+where W: Default {
+    fn default () -> Self {
+        Self {
             phase: 0.0,
             frequency: 0.0,
-            wave: Dynamic::Sine
+            wave: W::default()
         }
     }
 }
 
-impl Oscillator {
+impl<W: Waveform> Oscillator<W> {
     #[inline]
     pub fn step (&mut self, timestep: f32) -> () {
         self.phase = (self.phase + timestep * self.frequency).fract();
@@ -36,8 +37,12 @@ impl Oscillator {
         self.wave.value_at_phase((self.phase + phase_offset).fract())
     }
 
-    pub fn set_wave(&mut self, wave: Dynamic) -> () {
+    pub fn set_wave(&mut self, wave: W) -> () {
         self.wave = wave
+    }
+
+    pub fn get_wave_mut(&mut self) -> &mut W {
+        &mut self.wave
     }
 
     pub fn phase_reset(&mut self) -> () {

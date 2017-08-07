@@ -18,12 +18,13 @@ mod voice;
 mod envelope;
 mod oscillator;
 mod pendulum;
-// mod fermi;
+mod fermi;
 mod frame;
 
 use device::*;
 
 pub use pendulum::PendulumParams;
+pub use fermi::FermiParams;
 
 pub trait IndexedEnum {
     const NUM_ITEMS: u32;
@@ -39,12 +40,12 @@ pub trait IndexedEnum {
 
 pub enum DeviceType {
     Pendulum,
-    // Fermi,
+    Fermi,
 }
 
 pub fn create_device (device_type: DeviceType) -> Box<Device> {
     match device_type {
         DeviceType::Pendulum => Box::new(pendulum::Pendulum::default()),
-        // DeviceType::Fermi => Box::new(fermi::Fermi::default()),
+        DeviceType::Fermi => Box::new(fermi::Fermi::default()),
     }
 }

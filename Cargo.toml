@@ -3,7 +3,8 @@ members = [
     "surgemachine",
     "surgemachine-macros",
     "surgemachine-cdylib",
-    "surgemachine-vst"
+    "surgemachine-vst/fermi",
+    "surgemachine-vst/pendulum"
 ]
 
 [profile.dev]

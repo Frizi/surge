@@ -7,6 +7,11 @@ pub struct Square;
 pub struct SawExp2;
 pub struct Random;
 
+#[derive(Default)]
+pub struct SinSq {
+    pub square_mix: f32,
+}
+
 #[derive(Debug, Copy, Clone, IndexedEnum)]
 pub enum Dynamic {
     Sine,
@@ -16,9 +21,14 @@ pub enum Dynamic {
     Random,
 }
 
-pub trait Waveform {
-    fn value_at_phase (&self, phase: f32) -> f32;
+impl Default for Dynamic {
+    fn default() -> Dynamic { Dynamic::Sine }
 }
+
+pub trait Waveform {
+    fn value_at_phase(&self, phase: f32) -> f32;
+}
+
 
 impl Waveform for Dynamic {
     #[inline]
@@ -69,6 +79,14 @@ impl Waveform for Random {
     #[inline]
     fn value_at_phase(&self, _phase: f32) -> f32 {
         rand::random::<f32>() * 2.0 - 1.0
+    }
+}
+
+impl Waveform for SinSq {
+    #[inline]
+    fn value_at_phase(&self, phase: f32) -> f32 {
+        Sine.value_at_phase(phase) +
+        Square.value_at_phase(phase) * self.square_mix
     }
 }
 

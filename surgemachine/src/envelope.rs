@@ -1,3 +1,4 @@
+#[derive(Debug)]
 enum ADSRState {
     Idle,
     Attack,
@@ -15,6 +16,7 @@ pub trait Envelope {
     fn reset (&mut self) -> ();
 }
 
+#[derive(Debug)]
 pub struct ADSREnvelope {
     state: ADSRState,
     output: f32,

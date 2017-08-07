@@ -10,44 +10,56 @@ use voice::Voice;
 use poly_synth::PolySynth;
 
 type Bag = FermiParamsBag;
-pub type Fermi = PolySynth<FermiParams, Bag, FermiVoice>;
+pub type Fermi = PolySynth<FermiVoice>;
 
 #[derive(Debug, Clone, Copy, IndexedEnum)]
 pub enum FermiParams {
-    Osc1Waveform,
     Osc1RatioCoarse,
     Osc1RatioFine,
-    Osc1PhaseOffset,
-
-    Osc2Waveform,
-    Osc2RatioCoarse,
-    Osc2RatioFine,
-    Osc2PhaseOffset,
+    Osc1Feedback,
+    Osc1Feedforward,
 
     Osc1Attack,
     Osc1Decay,
     Osc1Sustain,
     Osc1Release,
 
+    Osc2RatioCoarse,
+    Osc2RatioFine,
+    Osc2Feedback,
+    Osc1Level,
+
     Osc2Attack,
     Osc2Decay,
     Osc2Sustain,
     Osc2Release,
 
-    Osc1Level,
-    Osc2Level,
+    Osc1Waveform,
+    Osc2Waveform,
     MasterLevel
 }
 
-define_params_bag!(FermiParamsBag, FermiParams, Default::default());
+define_params_bag!(FermiParamsBag, FermiParams, [
+    0.0, 0.0, 0.1, 0.1,
+    0.1, 0.2, 0.5, 0.4,
+    0.0, 0.0, 0.1, 0.5,
+    0.1, 0.2, 0.5, 0.4,
+    0.5, 0.2, 0.5,
+]);
 
 #[derive(Default)]
 pub struct FermiVoice {
     env1: ADSREnvelope,
     env2: ADSREnvelope,
-    osc1: Oscillator,
-    osc2: Oscillator,
+    osc1: Oscillator<SinSq>,
+    osc2: Oscillator<SinSq>,
     current_note: Option<u8>,
+    osc1_feedback: f32,
+    osc2_feedback: f32,
+    osc1_feedforward: f32,
+    osc1_level: f32,
+    osc1_output: f32,
+    osc2_output: f32
 }
 
 impl FermiVoice {
@@ -64,21 +76,42 @@ impl FermiVoice {
         self.env2.set_adsr(rate, a2, d2, s2, r2);
     }
 
+    fn setup_feeds(&mut self, params: &Bag) {
+        let raw_feedback1 = params.get(FermiParams::Osc1Feedback);
+        let raw_feedback2 = params.get(FermiParams::Osc2Feedback);
+        let raw_feedforward = params.get(FermiParams::Osc1Feedforward);
+
+        self.osc1_feedback = raw_feedback1 * raw_feedback1 / 2.0;
+        self.osc2_feedback = raw_feedback2 * raw_feedback2 / 2.0;
+        self.osc1_feedforward = raw_feedforward * raw_feedforward / 2.0;
+    }
+
     fn setup_waves(&mut self, params: &Bag) {
-        let w1 = Dynamic::from_param(params.get(FermiParams::Osc1Waveform));
-        let w2 = Dynamic::from_param(params.get(FermiParams::Osc2Waveform));
-        self.osc1.set_wave(w1);
-        self.osc2.set_wave(w2);
+        self.osc1.get_wave_mut().square_mix = params.get(FermiParams::Osc1Waveform);
+        self.osc2.get_wave_mut().square_mix = params.get(FermiParams::Osc2Waveform);
     }
 }
 
-impl Voice<FermiParams,Bag> for FermiVoice {
+impl Voice for FermiVoice {
+    type ParamsEnum = FermiParams;
+    type Bag = Bag;
+    type Depth = f32;
+    type PostParam = f32;
+
+    fn prepare_post(params: &Bag) -> f32 {
+        helpers::log_control(params.get(FermiParams::MasterLevel))
+    }
+
+    fn process_post(master: &f32, frame: Frame) -> Frame {
+        frame * *master
+    }
+
     fn init (&mut self, params: &Bag, rate: f32) {
         self.setup_envelopes(params, rate);
-        self.setup_waves(params);
     }
 
     fn current_note (&self) -> Option<u8> { self.current_note }
+
     fn is_finished (&self) -> bool {
         self.env1.is_finished() &&
         self.env2.is_finished()
@@ -87,17 +120,39 @@ impl Voice<FermiParams,Bag> for FermiVoice {
     fn note_on(&mut self, note: u8, _velocity: u8) {
         self.current_note = Some(note);
         self.env1.trigger();
-        self.env1.trigger();
+        self.env2.trigger();
+
+        self.osc1.phase_reset();
+        self.osc2.phase_reset();
+
+        self.osc1_output = 0.0;
+        self.osc2_output = 0.0;
     }
 
     fn note_off(&mut self, _note: u8, _velocity: u8) {
         self.current_note = None;
         self.env1.release();
-        self.env1.release();
+        self.env2.release();
     }
 
-    fn process_post(params: &Bag, frame: Frame) -> Frame {
-        frame * params.get(FermiParams::MasterLevel)
+    fn update_param(&mut self, bag: &Bag, param: FermiParams, rate: f32) {
+        match param {
+            FermiParams::Osc1Attack => self.setup_envelopes(bag, rate),
+            FermiParams::Osc1Decay => self.setup_envelopes(bag, rate),
+            FermiParams::Osc1Sustain => self.setup_envelopes(bag, rate),
+            FermiParams::Osc1Release => self.setup_envelopes(bag, rate),
+            FermiParams::Osc2Attack => self.setup_envelopes(bag, rate),
+            FermiParams::Osc2Decay => self.setup_envelopes(bag, rate),
+            FermiParams::Osc2Sustain => self.setup_envelopes(bag, rate),
+            FermiParams::Osc2Release => self.setup_envelopes(bag, rate),
+            FermiParams::Osc1Feedback => self.setup_feeds(bag),
+            FermiParams::Osc2Feedback => self.setup_feeds(bag),
+            FermiParams::Osc1Feedforward => self.setup_feeds(bag),
+            FermiParams::Osc1Waveform => self.setup_waves(bag),
+            FermiParams::Osc2Waveform => self.setup_waves(bag),
+            FermiParams::Osc1Level => self.osc1_level = helpers::log_control(bag.get(param)),
+            _ => (),
+        };
     }
 
     fn init_process(&mut self, params: &Bag) -> bool {
@@ -114,90 +169,38 @@ impl Voice<FermiParams,Bag> for FermiVoice {
                     params.get(FermiParams::Osc2RatioFine)
                 );
 
-
-                self.osc2_level = params.get(FermiParams::Osc2Level);
-                self.osc3_level = params.get(FermiParams::Osc3Level);
-                self.osc3_am = params.get(FermiParams::Osc3AM) > 0.5;
-
-                self.osc1.setup(freq1, detune1, phase_offset1);
-                self.osc2.setup(freq2, detune2, phase_offset2);
-                self.osc3.setup(freq3, detune3, phase_offset3);
-
+                self.osc1.set_freq(freq1);
+                self.osc2.set_freq(freq2);
                 true
             }
             _ => !self.is_finished()
         }
     }
 
-    fn update_param(&mut self, bag: &Bag, param: FermiParams, rate: f32) {
-        match param {
-            FermiParams::Osc1Attack => self.setup_envelopes(bag, rate),
-            FermiParams::Osc1Decay => self.setup_envelopes(bag, rate),
-            FermiParams::Osc1Sustain => self.setup_envelopes(bag, rate),
-            FermiParams::Osc1Release => self.setup_envelopes(bag, rate),
-            FermiParams::Osc2Attack => self.setup_envelopes(bag, rate),
-            FermiParams::Osc2Decay => self.setup_envelopes(bag, rate),
-            FermiParams::Osc2Sustain => self.setup_envelopes(bag, rate),
-            FermiParams::Osc2Release => self.setup_envelopes(bag, rate),
-            FermiParams::Osc3Attack => self.setup_envelopes(bag, rate),
-            FermiParams::Osc3Decay => self.setup_envelopes(bag, rate),
-            FermiParams::Osc3Sustain => self.setup_envelopes(bag, rate),
-            FermiParams::Osc3Release => self.setup_envelopes(bag, rate),
-            FermiParams::Osc1Waveform => self.setup_waves(bag),
-            FermiParams::Osc2Waveform => self.setup_waves(bag),
-            FermiParams::Osc3Waveform => self.setup_waves(bag),
-            _ => (),
-        };
-    }
-
     #[inline]
     fn process_sample(&mut self, timestep: f32) -> Frame {
-        let s1 = self.osc1.process_sample(timestep);
-        let s2 = self.osc2.process_sample(timestep) * self.osc2_level;
-        let s3 = self.osc3.process_sample(timestep) * self.osc3_level;
+        const MAGIC: f32 = 13.25;
 
-        // for (input_buffer, output_buffer) in inputs.iter().zip(outputs) {
-        //     let mut t = self.time;
-        //
-        //     // let osc1Feedback = fix_denormal(self.osc1Feedback * self.osc1Feedback / 2.0);
-        //     // let osc2Feedback = fix_denormal(self.osc2Feedback * self.osc2Feedback / 2.0);
-        //
-        //     for (_, output_sample) in input_buffer.iter().zip(output_buffer) {
-        //         if let Some(current_note) = self.note {
-        //             let signal = (t * midi_note_to_hz(current_note) * TAU).sin();
-        //
-        //             // let osc1Input = osc1Phase / currentSampleRate * TAU + fix_denormal(osc1Output * osc1Feedback);
-        //             // osc1Output = fix_denormal((sin(osc1Input) + square35(osc1Input) * osc1Waveform)) * osc1Env * 13.25;
-        //             //
-        //             // osc2Input = osc2Phase / currentSampleRate * TAU + fix_denormal(osc1Output * osc1Feedback * 13.25) + osc1Input * osc1FeedForwardScalar;
-        //             // osc2Output = fix_denormal((sin(osc2Input) + square35(osc2Input) * osc2Waveform)) * osc2Env;
-        //
-        //
-        //             // Apply a quick envelope to the attack of the signal to avoid popping.
-        //             let attack = 0.5;
-        //             let alpha = if self.note_duration < attack {
-        //  self.note_duration / attack
-        //             } else {
-        //  1.0
-        //             };
-        //
-        //             *output_sample = (signal * alpha) as f32;
-        //
-        //             t += per_sample;
-        //         } else {
-        //             *output_sample = 0.0;
-        //         }
-        //     }
-        // }
-        //
-        // self.time += samples as f64 * per_sample;
-        // self.note_duration += samples as f64 * per_sample;
+        let env1 = self.env1.get_value();
+        let env2 = self.env2.get_value();
 
+        let feedback1 = self.osc1_output * self.osc1_feedback;
+        let feedback2 = self.osc2_output * self.osc2_feedback;
 
-        if self.osc3_am {
-            (s1 + s2) * s3
-        } else {
-            s1 + s2 + s3
+        self.osc1_output = self.osc1.get_offset_value(feedback1) * env1 * MAGIC * self.osc1_level;
+        let feedforward = self.osc1_output * self.osc1_feedforward;
+        self.osc2_output = self.osc2.get_offset_value(feedback2 * MAGIC + feedforward) * env2;
+
+        // println!("{:?}, {:?}", self.osc1_output, self.osc2_output);
+
+        self.env1.process();
+        self.env2.process();
+        self.osc1.step(timestep);
+        self.osc2.step(timestep);
+
+        Frame {
+            l: self.osc2_output,
+            r: self.osc2_output
         }
     }
 }

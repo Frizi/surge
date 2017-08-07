@@ -1,5 +1,5 @@
 [package]
-name = "surgemachinevst"
+name = "pendulum-vst"
 version = "0.1.0"
 authors = ["Frizi <frizi09@gmail.com>"]
 
@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 vst2 = { git = "https://github.com/overdrivenpotato/rust-vst2" }
-surgemachine = { path = "../surgemachine" }
+surgemachine = { path = "../../surgemachine" }

@@ -1,0 +1,12 @@
+[package]
+name = "fermi-vst"
+version = "0.1.0"
+authors = ["Frizi <frizi09@gmail.com>"]
+
+[lib]
+name = "fermi"
+crate-type = ["cdylib"]
+
+[dependencies]
+vst2 = { git = "https://github.com/overdrivenpotato/rust-vst2" }
+surgemachine = { path = "../../surgemachine" }
