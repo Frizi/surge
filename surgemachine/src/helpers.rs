@@ -18,8 +18,20 @@ pub fn unit_to_db (unit: f32) -> f32 {
     10.0 * unit.log(10.0)
 }
 
+pub fn unit_to_cents (unit: f32) -> f32 {
+    (unit - 0.5) * 2400.0
+}
+
+pub fn cents_to_ratio (cents: f32) -> f32 {
+    (cents / 1200.0).exp2()
+}
+
 pub fn control_to_db(linear: f32) -> f32 {
     unit_to_db(log_control(linear))
+}
+
+pub fn param_detune(param: f32) -> f32 {
+    cents_to_ratio(unit_to_cents(param) * 0.1)
 }
 
 pub fn midi_note_to_hz(note: u8) -> f32 {

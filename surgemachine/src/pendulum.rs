@@ -164,9 +164,9 @@ impl Voice for PendulumVoice {
                     params.get(PendulumParams::Osc3RatioFine)
                 );
 
-                let detune1 = (params.get(PendulumParams::Osc1Detune) - 0.5) * 0.02 + 1.0;
-                let detune2 = (params.get(PendulumParams::Osc2Detune) - 0.5) * 0.02 + 1.0;
-                let detune3 = (params.get(PendulumParams::Osc3Detune) - 0.5) * 0.02 + 1.0;
+                let detune1 = helpers::param_detune(params.get(PendulumParams::Osc1Detune));
+                let detune2 = helpers::param_detune(params.get(PendulumParams::Osc2Detune));
+                let detune3 = helpers::param_detune(params.get(PendulumParams::Osc3Detune));
 
                 let phase_offset1 = params.get(PendulumParams::Osc1PhaseOffset);
                 let phase_offset2 = params.get(PendulumParams::Osc2PhaseOffset);
@@ -214,7 +214,7 @@ impl Voice for PendulumVoice {
         let s3 = self.osc3.process_sample(timestep) * self.osc3_level;
 
         (if self.osc3_am {
-            (s1 + s2) * s3
+            (s1 + s2) * (s3 * 0.5 + 0.5)
         } else {
             s1 + s2 + s3
         }) * self.velocity
@@ -289,7 +289,7 @@ impl PendulumOsc {
 
     fn setup(&mut self, freq: f32, detune: f32, phase_offset: f32) {
         self.phase_offset = phase_offset;
-        let detune_off =  (1.0 - detune.abs()) < 0.001;
+        let detune_off =  (1.0 - detune).abs() < 0.001;
 
         if detune_off {
             self.osc_l.set_freq(freq);

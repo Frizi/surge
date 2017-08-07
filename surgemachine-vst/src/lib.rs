@@ -100,6 +100,9 @@ impl Plugin for PendulumPlugin {
             PendulumParams::Osc2Level |
             PendulumParams::Osc3Level |
             PendulumParams::MasterLevel => "dB".to_string(),
+            PendulumParams::Osc1Detune |
+            PendulumParams::Osc2Detune |
+            PendulumParams::Osc3Detune => "cents".to_string(),
             _ => "".to_string()
         }
     }
@@ -116,7 +119,7 @@ impl Plugin for PendulumPlugin {
             PendulumParams::Osc3RatioCoarse => format!("{}", (value * 32.99).floor()),
             PendulumParams::Osc1Detune |
             PendulumParams::Osc2Detune |
-            PendulumParams::Osc3Detune => format!("{:.0}", (value * 24.0 - 12.0).round()),
+            PendulumParams::Osc3Detune => format!("{:.0}", (helpers::unit_to_cents(value) * 0.1).round()),
             PendulumParams::Osc2Level |
             PendulumParams::Osc3Level |
             PendulumParams::MasterLevel => format!("{:.0}", helpers::control_to_db(value)),

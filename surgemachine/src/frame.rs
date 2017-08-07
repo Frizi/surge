@@ -46,6 +46,16 @@ impl<T: Mul<Output=T> + Copy> Mul<T> for Frame<T> {
     }
 }
 
+impl<T: Add<Output=T> + Copy> Add<T> for Frame<T> {
+    type Output = Self;
+    fn add(self, other: T) -> Self {
+        Frame {
+            l: self.l + other,
+            r: self.r + other,
+        }
+    }
+}
+
 impl<T: Default + Add<Output=T>> Sum for Frame<T> {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Default::default(), | a, b | a + b)
