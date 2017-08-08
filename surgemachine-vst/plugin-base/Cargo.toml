@@ -1,12 +1,12 @@
 [package]
-name = "pendulum-vst"
+name = "surgemachine_plugin_base"
 version = "0.1.0"
 authors = ["Frizi <frizi09@gmail.com>"]
 
 [lib]
-name = "pendulum"
-crate-type = ["cdylib"]
+name = "surgemachine_plugin_base"
+crate-type = ["rlib"]
 
 [dependencies]
 vst2 = { git = "https://github.com/overdrivenpotato/rust-vst2" }
-surgemachine_plugin_base = { path = "../plugin-base" }
+surgemachine = { path = "../../surgemachine" }

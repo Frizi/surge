@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 vst2 = { git = "https://github.com/overdrivenpotato/rust-vst2" }
-surgemachine = { path = "../../surgemachine" }
+surgemachine_plugin_base = { path = "../plugin-base" }

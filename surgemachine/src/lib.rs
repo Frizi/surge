@@ -38,12 +38,13 @@ pub trait IndexedEnum {
     }
 }
 
+#[derive(Debug)]
 pub enum DeviceType {
     Pendulum,
     Fermi,
 }
 
-pub fn create_device (device_type: DeviceType) -> Box<Device> {
+pub fn create_device (device_type: DeviceType) -> Box<DevicePlugin> {
     match device_type {
         DeviceType::Pendulum => Box::new(pendulum::Pendulum::default()),
         DeviceType::Fermi => Box::new(fermi::Fermi::default()),

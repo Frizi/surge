@@ -3,6 +3,7 @@ members = [
     "surgemachine",
     "surgemachine-macros",
     "surgemachine-cdylib",
+    "surgemachine-vst/plugin-base",
     "surgemachine-vst/fermi",
     "surgemachine-vst/pendulum"
 ]

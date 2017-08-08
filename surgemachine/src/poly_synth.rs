@@ -63,22 +63,24 @@ impl<V:Voice<Depth=f32>> Device for PolySynth<V>
         }
     }
 
-    fn run (&mut self, mut outputs: AudioBus<f32>) {
+    fn run (&mut self, _inputs: Option<AudioBus<f32>>, outputs: Option<AudioBus<f32>>) {
         let timestep = helpers::time_per_sample(self.sample_rate);
 
         if !self.is_finished() {
             let (params, mut active_voices) = self.init_process();
             let postproc_data = V::prepare_post(params);
 
-            for (left_sample, right_sample) in helpers::frame_iter(&mut outputs) {
-                let signal = active_voices.iter_mut()
-                    .map(|voice| voice.process_sample(timestep))
-                    .sum::<Frame>();
+            if let Some(mut outs) = outputs {
+                for (left_sample, right_sample) in helpers::frame_iter(&mut outs) {
+                    let signal = active_voices.iter_mut()
+                        .map(|voice| voice.process_sample(timestep))
+                        .sum::<Frame>();
 
-                let signal = V::process_post(&postproc_data, signal);
+                    let signal = V::process_post(&postproc_data, signal);
 
-                *left_sample = signal.l;
-                *right_sample = signal.r;
+                    *left_sample = signal.l;
+                    *right_sample = signal.r;
+                }
             }
         }
     }

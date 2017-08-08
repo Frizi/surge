@@ -8,9 +8,46 @@ use frame::Frame;
 use params_bag::ParamsBag;
 use voice::Voice;
 use poly_synth::PolySynth;
+use device::{Device, DevicePlugin};
 
 type Bag = PendulumParamsBag;
 pub type Pendulum = PolySynth<PendulumVoice>;
+
+impl DevicePlugin for Pendulum {
+    fn get_parameter_name(&self, param: i32) -> String {
+        format!("{:?}", PendulumParams::from_index(param as _))
+    }
+    fn get_parameter_label(&self, param: i32) -> String {
+        match PendulumParams::from_index(param as _) {
+            PendulumParams::Osc2Level |
+            PendulumParams::Osc3Level |
+            PendulumParams::MasterLevel => "dB".to_string(),
+            PendulumParams::Osc1Detune |
+            PendulumParams::Osc2Detune |
+            PendulumParams::Osc3Detune => "cents".to_string(),
+            _ => "".to_string()
+        }
+    }
+    fn get_parameter_text(&self, param: i32) -> String {
+        let value = self.get_parameter(param);
+        match PendulumParams::from_index(param as _) {
+            PendulumParams::Osc1Waveform |
+            PendulumParams::Osc2Waveform |
+            PendulumParams::Osc3Waveform => format!("{:?}", Dynamic::from_param(value)),
+            PendulumParams::Osc1RatioCoarse |
+            PendulumParams::Osc2RatioCoarse |
+            PendulumParams::Osc3RatioCoarse => format!("{}", (value * 32.99).floor()),
+            PendulumParams::Osc1Detune |
+            PendulumParams::Osc2Detune |
+            PendulumParams::Osc3Detune => format!("{:.0}", (helpers::unit_to_cents(value) * 0.1).round()),
+            PendulumParams::Osc2Level |
+            PendulumParams::Osc3Level |
+            PendulumParams::MasterLevel => format!("{:.0}", helpers::control_to_db(value)),
+            PendulumParams::Osc3AM => format!("{:?}", value > 0.5),
+            _ => format!("{:.3}", value),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, IndexedEnum)]
 pub enum PendulumParams {

@@ -8,9 +8,35 @@ use frame::Frame;
 use params_bag::ParamsBag;
 use voice::Voice;
 use poly_synth::PolySynth;
+use device::{Device, DevicePlugin};
 
 type Bag = FermiParamsBag;
 pub type Fermi = PolySynth<FermiVoice>;
+
+impl DevicePlugin for Fermi {
+    fn get_parameter_name(&self, param: i32) -> String {
+        format!("{:?}", FermiParams::from_index(param as _))
+    }
+    fn get_parameter_label(&self, param: i32) -> String {
+        match FermiParams::from_index(param as _) {
+            FermiParams::Osc1Level |
+            FermiParams::MasterLevel => "dB".to_string(),
+            _ => "".to_string()
+        }
+    }
+    fn get_parameter_text(&self, param: i32) -> String {
+        let value = self.get_parameter(param);
+        match FermiParams::from_index(param as _) {
+            FermiParams::Osc1Waveform |
+            FermiParams::Osc2Waveform => format!("{:.1}", value),
+            FermiParams::Osc1RatioCoarse |
+            FermiParams::Osc2RatioCoarse => format!("{}", (value * 32.99).floor()),
+            FermiParams::Osc1Level |
+            FermiParams::MasterLevel => format!("{:.0}", helpers::control_to_db(value)),
+            _ => format!("{:.3}", value),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, IndexedEnum)]
 pub enum FermiParams {
@@ -57,9 +83,9 @@ pub struct FermiVoice {
     osc1_feedback: f32,
     osc2_feedback: f32,
     osc1_feedforward: f32,
-    osc1_level: f32,
     osc1_output: f32,
-    osc2_output: f32
+    osc2_output: f32,
+    velocity: f32,
 }
 
 impl FermiVoice {
@@ -77,13 +103,9 @@ impl FermiVoice {
     }
 
     fn setup_feeds(&mut self, params: &Bag) {
-        let raw_feedback1 = params.get(FermiParams::Osc1Feedback);
-        let raw_feedback2 = params.get(FermiParams::Osc2Feedback);
-        let raw_feedforward = params.get(FermiParams::Osc1Feedforward);
-
-        self.osc1_feedback = raw_feedback1 * raw_feedback1 / 2.0;
-        self.osc2_feedback = raw_feedback2 * raw_feedback2 / 2.0;
-        self.osc1_feedforward = raw_feedforward * raw_feedforward / 2.0;
+        self.osc1_feedback = helpers::log_control(params.get(FermiParams::Osc1Feedback));
+        self.osc2_feedback = helpers::log_control(params.get(FermiParams::Osc2Feedback));
+        self.osc1_feedforward = helpers::log_control(params.get(FermiParams::Osc1Feedforward))
     }
 
     fn setup_waves(&mut self, params: &Bag) {
@@ -117,7 +139,7 @@ impl Voice for FermiVoice {
         self.env2.is_finished()
     }
 
-    fn note_on(&mut self, note: u8, _velocity: u8) {
+    fn note_on(&mut self, note: u8, velocity: u8) {
         self.current_note = Some(note);
         self.env1.trigger();
         self.env2.trigger();
@@ -127,6 +149,7 @@ impl Voice for FermiVoice {
 
         self.osc1_output = 0.0;
         self.osc2_output = 0.0;
+        self.velocity = velocity as f32 / 127.0;
     }
 
     fn note_off(&mut self, _note: u8, _velocity: u8) {
@@ -150,7 +173,6 @@ impl Voice for FermiVoice {
             FermiParams::Osc1Feedforward => self.setup_feeds(bag),
             FermiParams::Osc1Waveform => self.setup_waves(bag),
             FermiParams::Osc2Waveform => self.setup_waves(bag),
-            FermiParams::Osc1Level => self.osc1_level = helpers::log_control(bag.get(param)),
             _ => (),
         };
     }
@@ -187,11 +209,9 @@ impl Voice for FermiVoice {
         let feedback1 = self.osc1_output * self.osc1_feedback;
         let feedback2 = self.osc2_output * self.osc2_feedback;
 
-        self.osc1_output = self.osc1.get_offset_value(feedback1) * env1 * MAGIC * self.osc1_level;
+        self.osc1_output = self.osc1.get_offset_value(feedback1) * env1 * MAGIC;
         let feedforward = self.osc1_output * self.osc1_feedforward;
         self.osc2_output = self.osc2.get_offset_value(feedback2 * MAGIC + feedforward) * env2;
-
-        // println!("{:?}, {:?}", self.osc1_output, self.osc2_output);
 
         self.env1.process();
         self.env2.process();
